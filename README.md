@@ -2,6 +2,8 @@
 
 IDE support for [Workflow Engine](https://github.com/GoCodeAlone/workflow) configuration files: real-time validation, autocomplete, hover docs, snippets, and AI assistant integration via MCP.
 
+> This extension requires workflow engine v0.3.0 or later.
+
 [![VS Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/GoCodeAlone.workflow-engine)](https://marketplace.visualstudio.com/items?itemName=GoCodeAlone.workflow-engine)
 [![VS Marketplace Downloads](https://img.shields.io/visual-studio-marketplace/d/GoCodeAlone.workflow-engine)](https://marketplace.visualstudio.com/items?itemName=GoCodeAlone.workflow-engine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -130,7 +132,7 @@ Press **F5** in VS Code to launch an Extension Development Host with the extensi
 The `wfctl` CLI is required for the command palette commands (validate, inspect, run, etc.).
 
 ```sh
-go install github.com/GoCodeAlone/workflow/cmd/wfctl@latest
+go install github.com/GoCodeAlone/workflow/cmd/wfctl@v0.3.0
 ```
 
 Verify: `wfctl --version`
@@ -140,7 +142,7 @@ Verify: `wfctl --version`
 The LSP server binary powers validation, autocomplete, and hover docs. It is downloaded automatically on first activation. You can also install it manually:
 
 ```sh
-go install github.com/GoCodeAlone/workflow/cmd/workflow-lsp-server@latest
+go install github.com/GoCodeAlone/workflow/cmd/workflow-lsp-server@v0.3.0
 ```
 
 If you install it manually, set `workflow.lspServer.path` to the binary path so the extension uses your local build instead of auto-downloading.
@@ -216,7 +218,7 @@ Any tool that reads `.vscode/mcp.json` and speaks the Model Context Protocol wil
 ### Installing workflow-mcp-server
 
 ```sh
-go install github.com/GoCodeAlone/workflow/cmd/workflow-mcp-server@latest
+go install github.com/GoCodeAlone/workflow/cmd/workflow-mcp-server@v0.3.0
 ```
 
 ---

@@ -1,333 +1,378 @@
 {
-  "wf:app": {
-    "prefix": "wf:app",
-    "description": "Workflow Engine application config skeleton",
+  "App Structure": {
+    "prefix": "app",
     "body": [
-      "name: ${1:my-app}",
-      "version: ${2:0.1.0}",
-      "",
-      "imports: []",
-      "",
-      "requires: {}",
-      "",
       "modules:",
-      "  ${3:server}:",
+      "  - name: ${1:server}",
       "    type: http.server",
       "    config:",
-      "      port: ${4:8080}",
+      "      address: ${2::8080}",
+      "  - name: ${3:router}",
+      "    type: http.router",
+      "    dependsOn:",
+      "      - ${1:server}",
       "",
       "workflows:",
-      "  ${5:main}:",
-      "    type: http",
-      "    config:",
-      "      module: ${3:server}",
-      "      routes: []",
-      ""
-    ]
+      "  http:",
+      "    routes: []",
+      "",
+      "triggers:",
+      "  http:",
+      "    port: ${4:8080}"
+    ],
+    "description": "Full application config skeleton"
   },
-  "wf:imports": {
-    "prefix": "wf:imports",
-    "description": "Workflow Engine imports list",
+  "Cache Modular Module": {
+    "prefix": "mod-cache",
     "body": [
-      "imports:",
-      "  - ${1:path/to/other.yaml}",
-      ""
-    ]
+      "- name: ${1:cache}",
+      "  type: cache.modular"
+    ],
+    "description": "Modular cache adapter"
   },
-  "wf:requires": {
-    "prefix": "wf:requires",
-    "description": "Workflow Engine requires block",
+  "HTTP Router Module": {
+    "prefix": "mod-http-router",
     "body": [
-      "requires:",
-      "  ${1:plugin-name}:",
-      "    version: ${2:>=1.0.0}",
-      ""
-    ]
+      "- name: ${1:router}",
+      "  type: http.router",
+      "  dependsOn:",
+      "    - ${2:server}"
+    ],
+    "description": "HTTP router module that dispatches requests to handlers"
   },
-  "wf:module": {
-    "prefix": "wf:module",
-    "description": "Generic Workflow module",
+  "HTTP Server Module": {
+    "prefix": "mod-http-server",
     "body": [
-      "${1:module-name}:",
-      "  type: ${2:module-type}",
-      "  config:",
-      "    ${3:key}: ${4:value}",
-      ""
-    ]
-  },
-  "wf:module:http-server": {
-    "prefix": "wf:module:http-server",
-    "description": "HTTP server module",
-    "body": [
-      "${1:server}:",
+      "- name: ${1:server}",
       "  type: http.server",
       "  config:",
-      "    port: ${2:8080}",
-      "    host: ${3:0.0.0.0}",
-      ""
-    ]
+      "    address: ${2::8080}"
+    ],
+    "description": "HTTP server module listening on a configurable address"
   },
-  "wf:module:router": {
-    "prefix": "wf:module:router",
-    "description": "HTTP router module",
+  "Imports Section": {
+    "prefix": "imports",
     "body": [
-      "${1:router}:",
-      "  type: http.router",
-      "  config:",
-      "    server: ${2:server}",
-      ""
-    ]
+      "imports:",
+      "  - ${1:config/modules.yaml}",
+      "  - ${2:config/workflows.yaml}"
+    ],
+    "description": "Import external configuration files"
   },
-  "wf:module:sqlite": {
-    "prefix": "wf:module:sqlite",
-    "description": "SQLite database module",
+  "JWT Auth Module": {
+    "prefix": "mod-jwt",
     "body": [
-      "${1:db}:",
-      "  type: store.sqlite",
-      "  config:",
-      "    path: ${2:./data/app.db}",
-      ""
-    ]
-  },
-  "wf:module:jwt": {
-    "prefix": "wf:module:jwt",
-    "description": "JWT auth module",
-    "body": [
-      "${1:auth}:",
+      "- name: ${1:auth}",
       "  type: auth.jwt",
       "  config:",
-      "    secret: ${2:\\${JWT_SECRET}}",
-      "    expiry: ${3:24h}",
-      ""
-    ]
+      "    secret: ${2:my-secret-key}",
+      "    tokenExpiry: ${3:24h}",
+      "    issuer: ${4:my-app}"
+    ],
+    "description": "JWT authentication module"
   },
-  "wf:pipeline": {
-    "prefix": "wf:pipeline",
-    "description": "Complete pipeline with trigger and steps",
+  "Messaging Broker Module": {
+    "prefix": "mod-broker",
     "body": [
-      "${1:pipeline-name}:",
-      "  trigger:",
-      "    type: http",
-      "    config:",
-      "      path: ${2:/api/${3:resource}}",
-      "      method: ${4|GET,POST,PUT,DELETE,PATCH|}",
-      "  steps:",
-      "    - name: ${5:step-1}",
-      "      type: step.set",
-      "      config:",
-      "        values:",
-      "          result: ${6:value}",
-      "    - name: ${7:respond}",
-      "      type: step.json_response",
-      "      config:",
-      "        status: 200",
-      "        body:",
-      "          message: ${8:ok}",
-      ""
-    ]
+      "- name: ${1:broker}",
+      "  type: messaging.broker",
+      "  config:",
+      "    maxQueueSize: ${2:1000}"
+    ],
+    "description": "In-process messaging broker for pub/sub"
   },
-  "wf:trigger:http": {
-    "prefix": "wf:trigger:http",
-    "description": "HTTP trigger",
+  "NoSQL Memory Module": {
+    "prefix": "mod-nosql",
+    "body": [
+      "- name: ${1:store}",
+      "  type: nosql.memory",
+      "  config:",
+      "    collection: ${2:documents}"
+    ],
+    "description": "In-memory NoSQL document store"
+  },
+  "OTEL Observability Module": {
+    "prefix": "mod-otel",
+    "body": [
+      "- name: ${1:otel}",
+      "  type: observability.otel",
+      "  config:",
+      "    endpoint: ${2:localhost:4317}",
+      "    serviceName: ${3:my-service}"
+    ],
+    "description": "OpenTelemetry observability module"
+  },
+  "Pipeline Scaffold": {
+    "prefix": "pipeline",
+    "body": [
+      "${1:my-pipeline}:",
+      "  trigger:",
+      "    type: ${2:http}",
+      "    config:",
+      "      path: ${3:/api/v1/resource}",
+      "      method: ${4:POST}",
+      "  steps:",
+      "    - type: step.validate",
+      "      config:",
+      "        required:",
+      "          - ${5:field}",
+      "    - type: step.json_response",
+      "      config:",
+      "        status: ${6:200}",
+      "        body: ${7:{ \"ok\": true }}"
+    ],
+    "description": "Full pipeline definition with trigger and steps"
+  },
+  "Requires Section": {
+    "prefix": "requires",
+    "body": [
+      "requires:",
+      "  version: ${1:v0.2.0}",
+      "  plugins:",
+      "    - ${2:storage}",
+      "    - ${3:auth}"
+    ],
+    "description": "Plugin and version dependency declarations"
+  },
+  "SQLite Storage Module": {
+    "prefix": "mod-sqlite",
+    "body": [
+      "- name: ${1:db}",
+      "  type: storage.sqlite",
+      "  config:",
+      "    dbPath: ${2:data/app.db}",
+      "    walMode: ${3:true}"
+    ],
+    "description": "SQLite database storage module"
+  },
+  "Secrets Vault Module": {
+    "prefix": "mod-secrets",
+    "body": [
+      "- name: ${1:secrets}",
+      "  type: secrets.vault",
+      "  config:",
+      "    mode: ${2:dev}",
+      "    address: ${3:http://localhost:8200}",
+      "    token: ${4:root}",
+      "    mountPath: ${5:secret}"
+    ],
+    "description": "HashiCorp Vault secrets module"
+  },
+  "State Machine Module": {
+    "prefix": "mod-statemachine",
+    "body": [
+      "- name: ${1:state-engine}",
+      "  type: statemachine.engine",
+      "  config:",
+      "    maxInstances: ${2:100}",
+      "    instanceTTL: ${3:24h}"
+    ],
+    "description": "State machine engine for workflow orchestration"
+  },
+  "Step: Auth Required": {
+    "prefix": "step-auth",
+    "body": [
+      "- type: step.auth_required",
+      "  config:",
+      "    roles:",
+      "      - ${1:admin}"
+    ],
+    "description": "Require authentication and optional role/scope"
+  },
+  "Step: Cache Get": {
+    "prefix": "step-cache-get",
+    "body": [
+      "- type: step.cache_get",
+      "  config:",
+      "    cache: ${1:cache}",
+      "    key: ${2:{{ .id }}}",
+      "    output: ${3:cached_result}"
+    ],
+    "description": "Get a value from the cache"
+  },
+  "Step: Cache Set": {
+    "prefix": "step-cache-set",
+    "body": [
+      "- type: step.cache_set",
+      "  config:",
+      "    cache: ${1:cache}",
+      "    key: ${2:{{ .id }}}",
+      "    value: ${3:{{ .result }}}",
+      "    ttl: ${4:5m}"
+    ],
+    "description": "Store a value in the cache with optional TTL"
+  },
+  "Step: DB Exec": {
+    "prefix": "step-db-exec",
+    "body": [
+      "- type: step.db_exec",
+      "  config:",
+      "    database: ${1:db}",
+      "    query: ${2:INSERT INTO ${3:table} (col) VALUES (?)}",
+      "    params:",
+      "      - ${4:{{ .value }}}"
+    ],
+    "description": "Execute a SQL write statement"
+  },
+  "Step: DB Query": {
+    "prefix": "step-db-query",
+    "body": [
+      "- type: step.db_query",
+      "  config:",
+      "    database: ${1:db}",
+      "    query: ${2:SELECT * FROM ${3:table} WHERE id = ?}",
+      "    params:",
+      "      - ${4:{{ .id }}}"
+    ],
+    "description": "Execute a read-only SQL query"
+  },
+  "Step: Event Publish": {
+    "prefix": "step-event-publish",
+    "body": [
+      "- type: step.event_publish",
+      "  config:",
+      "    broker: ${1:broker}",
+      "    topic: ${2:events.created}",
+      "    event_type: ${3:resource.created}",
+      "    payload: ${4:{{ json . }}}"
+    ],
+    "description": "Publish an event to the message broker"
+  },
+  "Step: HTTP Call": {
+    "prefix": "step-http-call",
+    "body": [
+      "- type: step.http_call",
+      "  config:",
+      "    url: ${1:https://api.example.com/endpoint}",
+      "    method: ${2:POST}",
+      "    headers:",
+      "      Content-Type: application/json",
+      "    body: ${3:{{ json . }}}",
+      "    timeout: ${4:30s}"
+    ],
+    "description": "Make an outbound HTTP request"
+  },
+  "Step: JSON Response": {
+    "prefix": "step-json-response",
+    "body": [
+      "- type: step.json_response",
+      "  config:",
+      "    status: ${1:200}",
+      "    body:",
+      "      ${2:message}: ${3:ok}"
+    ],
+    "description": "Return a JSON HTTP response"
+  },
+  "Step: Log": {
+    "prefix": "step-log",
+    "body": [
+      "- type: step.log",
+      "  config:",
+      "    level: ${1:info}",
+      "    message: ${2:Processing request: {{ .id }}}"
+    ],
+    "description": "Log a message at the specified level"
+  },
+  "Step: Set Variable": {
+    "prefix": "step-set",
+    "body": [
+      "- type: step.set",
+      "  config:",
+      "    values:",
+      "      ${1:key}: ${2:value}"
+    ],
+    "description": "Set a named variable in the pipeline context"
+  },
+  "Step: Transform": {
+    "prefix": "step-transform",
+    "body": [
+      "- type: step.transform",
+      "  config:",
+      "    mapping:",
+      "      ${1:output_field}: ${2:{{ .input_field }}}"
+    ],
+    "description": "Transform data using a mapping template"
+  },
+  "Step: Validate": {
+    "prefix": "step-validate",
+    "body": [
+      "- type: step.validate",
+      "  config:",
+      "    required:",
+      "      - ${1:field1}",
+      "    rules:",
+      "      ${2:field1}: ${3:string}"
+    ],
+    "description": "Validate request data against rules"
+  },
+  "Trigger: Event": {
+    "prefix": "trigger-event",
+    "body": [
+      "trigger:",
+      "  type: event",
+      "  config:",
+      "    topic: ${1:events.created}",
+      "    broker: ${2:broker}"
+    ],
+    "description": "Event-driven trigger subscribing to a topic"
+  },
+  "Trigger: HTTP": {
+    "prefix": "trigger-http",
     "body": [
       "trigger:",
       "  type: http",
       "  config:",
-      "    path: ${1:/api/${2:resource}}",
-      "    method: ${3|GET,POST,PUT,DELETE,PATCH|}",
-      ""
-    ]
+      "    path: ${1:/api/v1/${2:resource}}",
+      "    method: ${3:GET}"
+    ],
+    "description": "HTTP trigger for a specific path and method"
   },
-  "wf:trigger:schedule": {
-    "prefix": "wf:trigger:schedule",
-    "description": "Schedule (cron) trigger",
+  "Trigger: Schedule": {
+    "prefix": "trigger-schedule",
     "body": [
       "trigger:",
       "  type: schedule",
       "  config:",
       "    cron: ${1:0 * * * *}",
-      ""
-    ]
+      "    timezone: ${2:UTC}"
+    ],
+    "description": "Cron-based schedule trigger"
   },
-  "wf:trigger:event": {
-    "prefix": "wf:trigger:event",
-    "description": "Event trigger",
+  "Workflow: HTTP": {
+    "prefix": "workflow-http",
     "body": [
-      "trigger:",
-      "  type: event",
-      "  config:",
-      "    topic: ${1:events.${2:topic}}",
-      ""
-    ]
-  },
-  "wf:step:set": {
-    "prefix": "wf:step:set",
-    "description": "Set variables step",
-    "body": [
-      "- name: ${1:set-vars}",
-      "  type: step.set",
-      "  config:",
-      "    values:",
-      "      ${2:key}: ${3:value}",
-      ""
-    ]
-  },
-  "wf:step:http-call": {
-    "prefix": "wf:step:http-call",
-    "description": "HTTP call step",
-    "body": [
-      "- name: ${1:http-call}",
-      "  type: step.http_call",
-      "  config:",
-      "    url: ${2:https://api.example.com/${3:endpoint}}",
-      "    method: ${4|GET,POST,PUT,DELETE|}",
-      "    headers:",
-      "      Content-Type: application/json",
-      "    body: ${5:null}",
-      "  output: ${6:response}",
-      ""
-    ]
-  },
-  "wf:step:json-response": {
-    "prefix": "wf:step:json-response",
-    "description": "JSON HTTP response step",
-    "body": [
-      "- name: ${1:respond}",
-      "  type: step.json_response",
-      "  config:",
-      "    status: ${2:200}",
-      "    body:",
-      "      ${3:message}: ${4:ok}",
-      ""
-    ]
-  },
-  "wf:step:validate": {
-    "prefix": "wf:step:validate",
-    "description": "Input validation step",
-    "body": [
-      "- name: ${1:validate}",
-      "  type: step.validate",
-      "  config:",
-      "    schema:",
-      "      type: object",
-      "      required:",
-      "        - ${2:field}",
-      "      properties:",
-      "        ${2:field}:",
-      "          type: ${3:string}",
-      ""
-    ]
-  },
-  "wf:step:transform": {
-    "prefix": "wf:step:transform",
-    "description": "Data transform step",
-    "body": [
-      "- name: ${1:transform}",
-      "  type: step.transform",
-      "  config:",
-      "    template: |",
-      "      ${2:{{ .input }}}",
-      "  output: ${3:result}",
-      ""
-    ]
-  },
-  "wf:step:db-query": {
-    "prefix": "wf:step:db-query",
-    "description": "Database query step",
-    "body": [
-      "- name: ${1:db-query}",
-      "  type: step.db_query",
-      "  config:",
-      "    module: ${2:db}",
-      "    query: ${3:SELECT * FROM ${4:table} WHERE id = ?}",
-      "    args:",
-      "      - ${5:{{ .id }}}",
-      "  output: ${6:rows}",
-      ""
-    ]
-  },
-  "wf:step:db-exec": {
-    "prefix": "wf:step:db-exec",
-    "description": "Database execute step",
-    "body": [
-      "- name: ${1:db-exec}",
-      "  type: step.db_exec",
-      "  config:",
-      "    module: ${2:db}",
-      "    query: ${3:INSERT INTO ${4:table} (${5:col}) VALUES (?)}",
-      "    args:",
-      "      - ${6:{{ .value }}}",
-      ""
-    ]
-  },
-  "wf:step:auth": {
-    "prefix": "wf:step:auth",
-    "description": "Auth required step",
-    "body": [
-      "- name: ${1:require-auth}",
-      "  type: step.auth_required",
-      "  config:",
-      "    module: ${2:auth}",
-      ""
-    ]
-  },
-  "wf:step:log": {
-    "prefix": "wf:step:log",
-    "description": "Log step",
-    "body": [
-      "- name: ${1:log}",
-      "  type: step.log",
-      "  config:",
-      "    level: ${2|info,debug,warn,error|}",
-      "    message: ${3:{{ . }}}",
-      ""
-    ]
-  },
-  "wf:workflow:http": {
-    "prefix": "wf:workflow:http",
-    "description": "HTTP workflow definition",
-    "body": [
-      "${1:api}:",
-      "  type: http",
-      "  config:",
-      "    module: ${2:server}",
+      "workflows:",
+      "  http:",
       "    routes:",
-      "      - path: ${3:/api/${4:resource}}",
-      "        method: ${5|GET,POST,PUT,DELETE|}",
-      "        pipeline: ${6:pipeline-name}",
-      ""
-    ]
+      "      - path: ${1:/api/v1/${2:resource}}",
+      "        method: ${3:GET}",
+      "        pipeline: ${4:get-resources}"
+    ],
+    "description": "HTTP workflow handler with route definitions"
   },
-  "wf:workflow:messaging": {
-    "prefix": "wf:workflow:messaging",
-    "description": "Messaging/event workflow definition",
+  "Workflow: Messaging": {
+    "prefix": "workflow-messaging",
     "body": [
-      "${1:events}:",
-      "  type: messaging",
-      "  config:",
-      "    module: ${2:queue}",
+      "workflows:",
+      "  messaging:",
       "    subscriptions:",
-      "      - topic: ${3:events.${4:topic}}",
-      "        pipeline: ${5:pipeline-name}",
-      ""
-    ]
+      "      - topic: ${1:events.created}",
+      "        pipeline: ${2:handle-created}"
+    ],
+    "description": "Messaging workflow handler with topic subscriptions"
   },
-  "wf:workflow:statemachine": {
-    "prefix": "wf:workflow:statemachine",
-    "description": "State machine workflow definition",
+  "Workflow: State Machine": {
+    "prefix": "workflow-statemachine",
     "body": [
-      "${1:fsm}:",
-      "  type: statemachine",
-      "  config:",
-      "    initial: ${2:idle}",
+      "workflows:",
+      "  statemachine:",
+      "    engine: ${1:state-engine}",
       "    states:",
-      "      ${2:idle}:",
-      "        on:",
-      "          ${3:start}: ${4:running}",
-      "      ${4:running}:",
-      "        on:",
-      "          ${5:done}: ${6:complete}",
-      ""
-    ]
+      "      - name: ${2:pending}",
+      "        transitions:",
+      "          - name: ${3:submit}",
+      "            to: ${4:active}"
+    ],
+    "description": "State machine workflow handler"
   }
 }
