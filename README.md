@@ -1,0 +1,333 @@
+# Workflow Engine — VS Code Extension
+
+IDE support for [Workflow Engine](https://github.com/GoCodeAlone/workflow) configuration files: real-time validation, autocomplete, hover docs, snippets, and AI assistant integration via MCP.
+
+[![VS Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/GoCodeAlone.workflow-engine)](https://marketplace.visualstudio.com/items?itemName=GoCodeAlone.workflow-engine)
+[![VS Marketplace Downloads](https://img.shields.io/visual-studio-marketplace/d/GoCodeAlone.workflow-engine)](https://marketplace.visualstudio.com/items?itemName=GoCodeAlone.workflow-engine)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+---
+
+## Features
+
+### Real-Time Validation
+
+The extension connects to `workflow-lsp-server` (downloaded automatically on first activation) and surfaces diagnostics as you type in any `workflow.yaml`, `workflow.yml`, `app.yaml`, or `app.yml` file:
+
+- Unknown module types, step types, and trigger types
+- Missing `dependsOn` references
+- Unknown config keys within a module or step block
+- Schema violations caught by the bundled JSON Schema
+
+### Autocomplete
+
+Intelligent completions powered by the LSP server:
+
+- Module types (`http.server`, `store.sqlite`, `auth.jwt`, …)
+- Step types (`step.set`, `step.http_call`, `step.db_query`, …)
+- Trigger types (`http`, `schedule`, `event`, …)
+- Config keys scoped to the current module or step type
+- Template functions (`uuidv4`, `now`, `lower`, `default`, `json`)
+- `dependsOn` values drawn from the modules declared in the current file
+
+### Hover Documentation
+
+Hover over any module type, step type, or template function to see:
+
+- A description of the type
+- A table of available config fields with their types and descriptions
+- Template function signatures and examples
+
+### Code Snippets
+
+Snippets are available in `yaml` and `workflow-yaml` files. Type a prefix and press Tab to expand.
+
+| Prefix | Description |
+|---|---|
+| `wf:app` | Full application config skeleton |
+| `wf:imports` | `imports` list block |
+| `wf:requires` | `requires` block for plugin dependencies |
+| `wf:module` | Generic module entry |
+| `wf:module:http-server` | HTTP server module |
+| `wf:module:router` | HTTP router module |
+| `wf:module:sqlite` | SQLite database module |
+| `wf:module:jwt` | JWT auth module |
+| `wf:pipeline` | Complete pipeline with trigger and steps |
+| `wf:trigger:http` | HTTP trigger block |
+| `wf:trigger:schedule` | Schedule (cron) trigger block |
+| `wf:trigger:event` | Event trigger block |
+| `wf:step:set` | Set variables step |
+| `wf:step:http-call` | HTTP call step |
+| `wf:step:json-response` | JSON HTTP response step |
+| `wf:step:validate` | Input validation step |
+| `wf:step:transform` | Data transform step |
+| `wf:step:db-query` | Database query step |
+| `wf:step:db-exec` | Database execute step |
+| `wf:step:auth` | Auth required step |
+| `wf:step:log` | Log step |
+| `wf:workflow:http` | HTTP workflow definition |
+| `wf:workflow:messaging` | Messaging/event workflow definition |
+| `wf:workflow:statemachine` | State machine workflow definition |
+
+### Command Palette Integration
+
+All `wfctl` commands are available via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`). Output appears in the **Workflow** output channel. See the [Commands Reference](#commands-reference) section below.
+
+### MCP Server Integration
+
+On workspace open, the extension offers to register `workflow-mcp-server` in `.vscode/mcp.json`. This makes Workflow Engine context available to AI assistants that support the [Model Context Protocol](https://modelcontextprotocol.io/):
+
+- **Claude** (VS Code extension or claude.ai/code)
+- **GitHub Copilot** (VS Code)
+- **Cursor**
+
+### JSON Schema Validation
+
+A bundled JSON Schema (`schemas/workflow-config.schema.json`) provides baseline validation for `workflow.yaml`, `workflow.yml`, `app.yaml`, and `app.yml` files even when the LSP server is disabled.
+
+---
+
+## Installation
+
+### From VS Code Marketplace
+
+> Note: the extension is not yet published to the marketplace. Once published, install with:
+
+```
+ext install GoCodeAlone.workflow-engine
+```
+
+Or search for **Workflow Engine** in the Extensions view (`Ctrl+Shift+X`).
+
+### From VSIX (GitHub Releases)
+
+1. Download `workflow-engine-x.x.x.vsix` from the [GitHub Releases](https://github.com/GoCodeAlone/workflow-vscode/releases) page.
+2. Install it:
+
+```sh
+code --install-extension workflow-engine-x.x.x.vsix
+```
+
+Or use the Extensions view: click the `...` menu, choose **Install from VSIX...**, and select the file.
+
+### From Source
+
+```sh
+git clone git@github.com:GoCodeAlone/workflow-vscode.git
+cd workflow-vscode
+npm install
+npm run build
+```
+
+Press **F5** in VS Code to launch an Extension Development Host with the extension loaded.
+
+---
+
+## Prerequisites
+
+### wfctl
+
+The `wfctl` CLI is required for the command palette commands (validate, inspect, run, etc.).
+
+```sh
+go install github.com/GoCodeAlone/workflow/cmd/wfctl@latest
+```
+
+Verify: `wfctl --version`
+
+### workflow-lsp-server
+
+The LSP server binary powers validation, autocomplete, and hover docs. It is downloaded automatically on first activation. You can also install it manually:
+
+```sh
+go install github.com/GoCodeAlone/workflow/cmd/workflow-lsp-server@latest
+```
+
+If you install it manually, set `workflow.lspServer.path` to the binary path so the extension uses your local build instead of auto-downloading.
+
+---
+
+## Configuration
+
+All settings are under the `workflow.*` namespace in VS Code settings.
+
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `workflow.wfctl.path` | `string` | `"wfctl"` | Path to the `wfctl` binary. Defaults to `wfctl` (must be on `PATH`). |
+| `workflow.lspServer.path` | `string` | `""` | Path to the `workflow-lsp-server` binary. Leave empty to auto-download from GitHub Releases. |
+| `workflow.lspServer.enabled` | `boolean` | `true` | Enable the Workflow LSP server for rich language features. |
+| `workflow.mcpServer.autoRegister` | `boolean` | `true` | Automatically register `workflow-mcp-server` in `.vscode/mcp.json` on workspace open. |
+
+Example `settings.json`:
+
+```json
+{
+  "workflow.wfctl.path": "/usr/local/bin/wfctl",
+  "workflow.lspServer.path": "/usr/local/bin/workflow-lsp-server",
+  "workflow.lspServer.enabled": true,
+  "workflow.mcpServer.autoRegister": true
+}
+```
+
+---
+
+## Commands Reference
+
+| Command | Title | Description |
+|---|---|---|
+| `workflow.validate` | Workflow: Validate Config | Runs `wfctl template validate --config <active-file>` and streams output to the Workflow channel. |
+| `workflow.inspect` | Workflow: Inspect | Runs `wfctl inspect -deps <active-file>` to print the dependency graph. |
+| `workflow.init` | Workflow: Init Project | Shows a quick-pick of project templates (`api-service`, `event-processor`, `full-stack`, `plugin`, `ui-plugin`) then runs `wfctl template init <template>`. |
+| `workflow.templateValidate` | Workflow: Template Validate | Runs `wfctl template validate` against the workspace root. |
+| `workflow.run` | Workflow: Run | Opens an integrated terminal and runs `wfctl run -config <active-file>` (long-running process). |
+| `workflow.schema` | Workflow: Generate Schema | Runs `wfctl schema` and opens the resulting JSON Schema in a new editor tab. |
+
+---
+
+## MCP Integration
+
+When `workflow.mcpServer.autoRegister` is `true` (the default), the extension checks for a `workflow` entry in `.vscode/mcp.json` on every workspace open. If the entry is absent, it prompts:
+
+> Add the Workflow MCP server to .vscode/mcp.json for AI assistant integration?
+
+Choosing **Add** writes the following entry to `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "workflow": {
+      "command": "workflow-mcp-server",
+      "args": []
+    }
+  }
+}
+```
+
+Choosing **Never** sets `workflow.mcpServer.autoRegister` to `false` in workspace settings so the prompt does not appear again.
+
+### Supported AI Tools
+
+Any tool that reads `.vscode/mcp.json` and speaks the Model Context Protocol will pick up the server automatically:
+
+- **Claude** (claude.ai/code or the VS Code extension)
+- **GitHub Copilot** in VS Code (agent mode)
+- **Cursor**
+
+### Installing workflow-mcp-server
+
+```sh
+go install github.com/GoCodeAlone/workflow/cmd/workflow-mcp-server@latest
+```
+
+---
+
+## Development
+
+### Build from Source
+
+```sh
+git clone git@github.com:GoCodeAlone/workflow-vscode.git
+cd workflow-vscode
+npm install
+npm run build        # produces out/extension.js via esbuild
+```
+
+### Type-check Without Building
+
+```sh
+npx tsc --noEmit
+```
+
+### Watch Mode
+
+```sh
+npm run watch        # recompiles on every save
+```
+
+### Launch Extension Development Host
+
+Press **F5** in VS Code (or run the **Launch Extension** debug configuration). A new VS Code window opens with the extension loaded.
+
+### Package for Distribution
+
+```sh
+npm run package      # produces workflow-engine-x.x.x.vsix
+```
+
+---
+
+## Publishing to VS Code Marketplace
+
+### One-Time Setup
+
+1. Create a publisher account at https://marketplace.visualstudio.com/manage. The publisher name must match the `publisher` field in `package.json` (`GoCodeAlone`).
+
+2. Generate a Personal Access Token (PAT) from Azure DevOps:
+   - Go to https://dev.azure.com and sign in with the same Microsoft account.
+   - Click your avatar > **Personal access tokens** > **New Token**.
+   - Set the scope to **Marketplace > Manage**.
+   - Copy the token — it is shown only once.
+
+3. Install the `vsce` CLI:
+
+   ```sh
+   npm install -g @vscode/vsce
+   ```
+
+4. Authenticate:
+
+   ```sh
+   vsce login GoCodeAlone
+   # Paste your PAT when prompted
+   ```
+
+### Manual Publish
+
+```sh
+npm run package      # produces .vsix
+vsce publish         # publishes to the marketplace
+```
+
+To bump the version and publish in one step:
+
+```sh
+vsce publish minor   # increments minor version, packages, and publishes
+vsce publish patch   # increments patch version, packages, and publishes
+```
+
+### Automated CI/CD
+
+The `.github/workflows/release.yml` workflow handles publishing automatically:
+
+- Every push to `main` runs a build and type-check.
+- Every `v*` tag push additionally packages the extension and publishes it to the VS Code Marketplace using the `VSCE_PAT` secret.
+
+To set up the secret:
+1. Go to the repository on GitHub > **Settings** > **Secrets and variables** > **Actions**.
+2. Create a secret named `VSCE_PAT` with your Azure DevOps PAT value.
+3. Push a tag: `git tag v0.1.0 && git push origin v0.1.0`.
+
+### Open VSX Registry (Open-Source IDEs)
+
+To make the extension available in VS Codium, Gitpod, and other open-source VS Code forks, also publish to the [Open VSX Registry](https://open-vsx.org):
+
+```sh
+npm run package
+npx ovsx publish workflow-engine-x.x.x.vsix -p <OVSX_PAT>
+```
+
+Obtain an Open VSX PAT from https://open-vsx.org/user-settings/tokens.
+
+### Verification
+
+After publishing, the extension appears at:
+
+```
+https://marketplace.visualstudio.com/items?itemName=GoCodeAlone.workflow-engine
+```
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
