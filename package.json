@@ -1,0 +1,144 @@
+{
+  "name": "workflow-engine",
+  "displayName": "Workflow Engine",
+  "description": "IDE support for Workflow Engine configs — validation, autocomplete, snippets, and AI integration",
+  "version": "0.1.0",
+  "publisher": "GoCodeAlone",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GoCodeAlone/workflow-vscode.git"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets",
+    "Other"
+  ],
+  "keywords": [
+    "workflow",
+    "yaml",
+    "lsp",
+    "validation",
+    "wfctl"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "activationEvents": [
+    "workspaceContains:**/workflow.yaml",
+    "workspaceContains:**/workflow.yml",
+    "workspaceContains:**/app.yaml",
+    "workspaceContains:**/app.yml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "workflow-yaml",
+        "aliases": [
+          "Workflow YAML",
+          "workflow-yaml"
+        ],
+        "filenames": [
+          "workflow.yaml",
+          "workflow.yml",
+          "app.yaml",
+          "app.yml"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "workflow.validate",
+        "title": "Workflow: Validate Config"
+      },
+      {
+        "command": "workflow.inspect",
+        "title": "Workflow: Inspect"
+      },
+      {
+        "command": "workflow.init",
+        "title": "Workflow: Init Project"
+      },
+      {
+        "command": "workflow.templateValidate",
+        "title": "Workflow: Template Validate"
+      },
+      {
+        "command": "workflow.run",
+        "title": "Workflow: Run"
+      },
+      {
+        "command": "workflow.schema",
+        "title": "Workflow: Generate Schema"
+      }
+    ],
+    "configuration": {
+      "title": "Workflow Engine",
+      "properties": {
+        "workflow.wfctl.path": {
+          "type": "string",
+          "default": "wfctl",
+          "description": "Path to the wfctl binary. Defaults to 'wfctl' (must be on PATH)."
+        },
+        "workflow.lspServer.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the workflow-lsp-server binary. Leave empty to auto-download from GitHub Releases."
+        },
+        "workflow.lspServer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Workflow LSP server for rich language features."
+        },
+        "workflow.mcpServer.autoRegister": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically register the workflow-mcp-server in .vscode/mcp.json on workspace open."
+        }
+      }
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": [
+          "workflow.yaml",
+          "workflow.yml",
+          "app.yaml",
+          "app.yml"
+        ],
+        "url": "./schemas/workflow-config.schema.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "yaml",
+        "path": "./snippets/workflow.json"
+      },
+      {
+        "language": "workflow-yaml",
+        "path": "./snippets/workflow.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.config.js",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

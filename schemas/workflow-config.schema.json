@@ -1,0 +1,324 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/GoCodeAlone/workflow/schemas/workflow-config.schema.json",
+  "title": "Workflow Engine Config",
+  "description": "Schema for Workflow Engine configuration files (workflow.yaml, app.yaml). Run 'wfctl schema' to generate the full schema.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Application name"
+    },
+    "version": {
+      "type": "string",
+      "description": "Application version (semver)"
+    },
+    "imports": {
+      "type": "array",
+      "description": "Paths to other YAML config files to import",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requires": {
+      "type": "object",
+      "description": "Plugin dependencies with version constraints",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "Version constraint (e.g. >=1.0.0)"
+          },
+          "source": {
+            "type": "string",
+            "description": "Plugin source URL or registry path"
+          }
+        }
+      }
+    },
+    "modules": {
+      "type": "object",
+      "description": "Named module instances",
+      "additionalProperties": {
+        "$ref": "#/definitions/module"
+      }
+    },
+    "workflows": {
+      "type": "object",
+      "description": "Named workflow definitions",
+      "additionalProperties": {
+        "$ref": "#/definitions/workflow"
+      }
+    },
+    "triggers": {
+      "type": "object",
+      "description": "Named trigger definitions",
+      "additionalProperties": {
+        "$ref": "#/definitions/trigger"
+      }
+    },
+    "pipelines": {
+      "type": "object",
+      "description": "Named pipeline definitions",
+      "additionalProperties": {
+        "$ref": "#/definitions/pipeline"
+      }
+    },
+    "platform": {
+      "type": "object",
+      "description": "Platform-specific configuration (kubernetes, ecs, etc.)",
+      "additionalProperties": true,
+      "properties": {
+        "kubernetes": {
+          "$ref": "#/definitions/platformKubernetes"
+        },
+        "ecs": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  },
+  "definitions": {
+    "module": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Module type identifier (e.g. http.server, store.sqlite, auth.jwt)",
+          "examples": [
+            "http.server",
+            "http.router",
+            "store.sqlite",
+            "store.postgres",
+            "auth.jwt",
+            "cache.redis",
+            "queue.nats",
+            "observability.otel"
+          ]
+        },
+        "config": {
+          "type": "object",
+          "description": "Module-specific configuration",
+          "additionalProperties": true
+        },
+        "dependsOn": {
+          "type": "array",
+          "description": "Module names this module depends on (for init ordering)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this module is enabled",
+          "default": true
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Workflow type",
+          "enum": ["http", "messaging", "statemachine", "scheduler", "grpc"]
+        },
+        "config": {
+          "type": "object",
+          "description": "Workflow-specific configuration",
+          "additionalProperties": true,
+          "properties": {
+            "module": {
+              "type": "string",
+              "description": "Module name this workflow attaches to"
+            },
+            "routes": {
+              "type": "array",
+              "description": "HTTP routes (for type: http)",
+              "items": {
+                "$ref": "#/definitions/httpRoute"
+              }
+            },
+            "subscriptions": {
+              "type": "array",
+              "description": "Message subscriptions (for type: messaging)",
+              "items": {
+                "$ref": "#/definitions/subscription"
+              }
+            }
+          }
+        }
+      }
+    },
+    "httpRoute": {
+      "type": "object",
+      "required": ["path", "pipeline"],
+      "additionalProperties": true,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "URL path pattern (e.g. /api/users/{id})"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+        },
+        "pipeline": {
+          "type": "string",
+          "description": "Pipeline name to execute"
+        }
+      }
+    },
+    "subscription": {
+      "type": "object",
+      "required": ["topic", "pipeline"],
+      "properties": {
+        "topic": {
+          "type": "string",
+          "description": "Message topic or queue name"
+        },
+        "pipeline": {
+          "type": "string",
+          "description": "Pipeline name to execute"
+        }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Trigger type",
+          "enum": ["http", "schedule", "event", "manual"]
+        },
+        "config": {
+          "type": "object",
+          "description": "Trigger-specific configuration",
+          "additionalProperties": true,
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "HTTP path (for type: http)"
+            },
+            "method": {
+              "type": "string",
+              "description": "HTTP method (for type: http)",
+              "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+            },
+            "cron": {
+              "type": "string",
+              "description": "Cron expression (for type: schedule)"
+            },
+            "topic": {
+              "type": "string",
+              "description": "Event topic (for type: event)"
+            }
+          }
+        }
+      }
+    },
+    "pipeline": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "trigger": {
+          "$ref": "#/definitions/trigger",
+          "description": "Inline trigger definition"
+        },
+        "steps": {
+          "type": "array",
+          "description": "Ordered list of pipeline steps",
+          "items": {
+            "$ref": "#/definitions/step"
+          }
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Step name (used for referencing output via {{ index .steps \"step-name\" \"key\" }})"
+        },
+        "type": {
+          "type": "string",
+          "description": "Step type identifier",
+          "examples": [
+            "step.set",
+            "step.http_call",
+            "step.json_response",
+            "step.validate",
+            "step.transform",
+            "step.db_query",
+            "step.db_exec",
+            "step.auth_required",
+            "step.log",
+            "step.condition",
+            "step.loop",
+            "step.parallel",
+            "step.cache_get",
+            "step.cache_set",
+            "step.event_publish",
+            "step.dlq_send",
+            "step.retry_with_backoff",
+            "step.resilient_circuit_breaker",
+            "step.git_clone",
+            "step.git_commit",
+            "step.git_push"
+          ]
+        },
+        "config": {
+          "type": "object",
+          "description": "Step-specific configuration",
+          "additionalProperties": true
+        },
+        "output": {
+          "type": "string",
+          "description": "Variable name to store step output in"
+        },
+        "condition": {
+          "type": "string",
+          "description": "Go template expression; step is skipped if it evaluates to false/empty"
+        },
+        "onError": {
+          "type": "string",
+          "description": "Error handling strategy",
+          "enum": ["stop", "continue", "retry"]
+        }
+      }
+    },
+    "platformKubernetes": {
+      "type": "object",
+      "description": "Kubernetes platform configuration",
+      "additionalProperties": true,
+      "properties": {
+        "cluster": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "name": { "type": "string" },
+            "provider": {
+              "type": "string",
+              "enum": ["eks", "gke", "aks", "kind", "generic"]
+            }
+          }
+        },
+        "namespace": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,333 @@
+{
+  "wf:app": {
+    "prefix": "wf:app",
+    "description": "Workflow Engine application config skeleton",
+    "body": [
+      "name: ${1:my-app}",
+      "version: ${2:0.1.0}",
+      "",
+      "imports: []",
+      "",
+      "requires: {}",
+      "",
+      "modules:",
+      "  ${3:server}:",
+      "    type: http.server",
+      "    config:",
+      "      port: ${4:8080}",
+      "",
+      "workflows:",
+      "  ${5:main}:",
+      "    type: http",
+      "    config:",
+      "      module: ${3:server}",
+      "      routes: []",
+      ""
+    ]
+  },
+  "wf:imports": {
+    "prefix": "wf:imports",
+    "description": "Workflow Engine imports list",
+    "body": [
+      "imports:",
+      "  - ${1:path/to/other.yaml}",
+      ""
+    ]
+  },
+  "wf:requires": {
+    "prefix": "wf:requires",
+    "description": "Workflow Engine requires block",
+    "body": [
+      "requires:",
+      "  ${1:plugin-name}:",
+      "    version: ${2:>=1.0.0}",
+      ""
+    ]
+  },
+  "wf:module": {
+    "prefix": "wf:module",
+    "description": "Generic Workflow module",
+    "body": [
+      "${1:module-name}:",
+      "  type: ${2:module-type}",
+      "  config:",
+      "    ${3:key}: ${4:value}",
+      ""
+    ]
+  },
+  "wf:module:http-server": {
+    "prefix": "wf:module:http-server",
+    "description": "HTTP server module",
+    "body": [
+      "${1:server}:",
+      "  type: http.server",
+      "  config:",
+      "    port: ${2:8080}",
+      "    host: ${3:0.0.0.0}",
+      ""
+    ]
+  },
+  "wf:module:router": {
+    "prefix": "wf:module:router",
+    "description": "HTTP router module",
+    "body": [
+      "${1:router}:",
+      "  type: http.router",
+      "  config:",
+      "    server: ${2:server}",
+      ""
+    ]
+  },
+  "wf:module:sqlite": {
+    "prefix": "wf:module:sqlite",
+    "description": "SQLite database module",
+    "body": [
+      "${1:db}:",
+      "  type: store.sqlite",
+      "  config:",
+      "    path: ${2:./data/app.db}",
+      ""
+    ]
+  },
+  "wf:module:jwt": {
+    "prefix": "wf:module:jwt",
+    "description": "JWT auth module",
+    "body": [
+      "${1:auth}:",
+      "  type: auth.jwt",
+      "  config:",
+      "    secret: ${2:\\${JWT_SECRET}}",
+      "    expiry: ${3:24h}",
+      ""
+    ]
+  },
+  "wf:pipeline": {
+    "prefix": "wf:pipeline",
+    "description": "Complete pipeline with trigger and steps",
+    "body": [
+      "${1:pipeline-name}:",
+      "  trigger:",
+      "    type: http",
+      "    config:",
+      "      path: ${2:/api/${3:resource}}",
+      "      method: ${4|GET,POST,PUT,DELETE,PATCH|}",
+      "  steps:",
+      "    - name: ${5:step-1}",
+      "      type: step.set",
+      "      config:",
+      "        values:",
+      "          result: ${6:value}",
+      "    - name: ${7:respond}",
+      "      type: step.json_response",
+      "      config:",
+      "        status: 200",
+      "        body:",
+      "          message: ${8:ok}",
+      ""
+    ]
+  },
+  "wf:trigger:http": {
+    "prefix": "wf:trigger:http",
+    "description": "HTTP trigger",
+    "body": [
+      "trigger:",
+      "  type: http",
+      "  config:",
+      "    path: ${1:/api/${2:resource}}",
+      "    method: ${3|GET,POST,PUT,DELETE,PATCH|}",
+      ""
+    ]
+  },
+  "wf:trigger:schedule": {
+    "prefix": "wf:trigger:schedule",
+    "description": "Schedule (cron) trigger",
+    "body": [
+      "trigger:",
+      "  type: schedule",
+      "  config:",
+      "    cron: ${1:0 * * * *}",
+      ""
+    ]
+  },
+  "wf:trigger:event": {
+    "prefix": "wf:trigger:event",
+    "description": "Event trigger",
+    "body": [
+      "trigger:",
+      "  type: event",
+      "  config:",
+      "    topic: ${1:events.${2:topic}}",
+      ""
+    ]
+  },
+  "wf:step:set": {
+    "prefix": "wf:step:set",
+    "description": "Set variables step",
+    "body": [
+      "- name: ${1:set-vars}",
+      "  type: step.set",
+      "  config:",
+      "    values:",
+      "      ${2:key}: ${3:value}",
+      ""
+    ]
+  },
+  "wf:step:http-call": {
+    "prefix": "wf:step:http-call",
+    "description": "HTTP call step",
+    "body": [
+      "- name: ${1:http-call}",
+      "  type: step.http_call",
+      "  config:",
+      "    url: ${2:https://api.example.com/${3:endpoint}}",
+      "    method: ${4|GET,POST,PUT,DELETE|}",
+      "    headers:",
+      "      Content-Type: application/json",
+      "    body: ${5:null}",
+      "  output: ${6:response}",
+      ""
+    ]
+  },
+  "wf:step:json-response": {
+    "prefix": "wf:step:json-response",
+    "description": "JSON HTTP response step",
+    "body": [
+      "- name: ${1:respond}",
+      "  type: step.json_response",
+      "  config:",
+      "    status: ${2:200}",
+      "    body:",
+      "      ${3:message}: ${4:ok}",
+      ""
+    ]
+  },
+  "wf:step:validate": {
+    "prefix": "wf:step:validate",
+    "description": "Input validation step",
+    "body": [
+      "- name: ${1:validate}",
+      "  type: step.validate",
+      "  config:",
+      "    schema:",
+      "      type: object",
+      "      required:",
+      "        - ${2:field}",
+      "      properties:",
+      "        ${2:field}:",
+      "          type: ${3:string}",
+      ""
+    ]
+  },
+  "wf:step:transform": {
+    "prefix": "wf:step:transform",
+    "description": "Data transform step",
+    "body": [
+      "- name: ${1:transform}",
+      "  type: step.transform",
+      "  config:",
+      "    template: |",
+      "      ${2:{{ .input }}}",
+      "  output: ${3:result}",
+      ""
+    ]
+  },
+  "wf:step:db-query": {
+    "prefix": "wf:step:db-query",
+    "description": "Database query step",
+    "body": [
+      "- name: ${1:db-query}",
+      "  type: step.db_query",
+      "  config:",
+      "    module: ${2:db}",
+      "    query: ${3:SELECT * FROM ${4:table} WHERE id = ?}",
+      "    args:",
+      "      - ${5:{{ .id }}}",
+      "  output: ${6:rows}",
+      ""
+    ]
+  },
+  "wf:step:db-exec": {
+    "prefix": "wf:step:db-exec",
+    "description": "Database execute step",
+    "body": [
+      "- name: ${1:db-exec}",
+      "  type: step.db_exec",
+      "  config:",
+      "    module: ${2:db}",
+      "    query: ${3:INSERT INTO ${4:table} (${5:col}) VALUES (?)}",
+      "    args:",
+      "      - ${6:{{ .value }}}",
+      ""
+    ]
+  },
+  "wf:step:auth": {
+    "prefix": "wf:step:auth",
+    "description": "Auth required step",
+    "body": [
+      "- name: ${1:require-auth}",
+      "  type: step.auth_required",
+      "  config:",
+      "    module: ${2:auth}",
+      ""
+    ]
+  },
+  "wf:step:log": {
+    "prefix": "wf:step:log",
+    "description": "Log step",
+    "body": [
+      "- name: ${1:log}",
+      "  type: step.log",
+      "  config:",
+      "    level: ${2|info,debug,warn,error|}",
+      "    message: ${3:{{ . }}}",
+      ""
+    ]
+  },
+  "wf:workflow:http": {
+    "prefix": "wf:workflow:http",
+    "description": "HTTP workflow definition",
+    "body": [
+      "${1:api}:",
+      "  type: http",
+      "  config:",
+      "    module: ${2:server}",
+      "    routes:",
+      "      - path: ${3:/api/${4:resource}}",
+      "        method: ${5|GET,POST,PUT,DELETE|}",
+      "        pipeline: ${6:pipeline-name}",
+      ""
+    ]
+  },
+  "wf:workflow:messaging": {
+    "prefix": "wf:workflow:messaging",
+    "description": "Messaging/event workflow definition",
+    "body": [
+      "${1:events}:",
+      "  type: messaging",
+      "  config:",
+      "    module: ${2:queue}",
+      "    subscriptions:",
+      "      - topic: ${3:events.${4:topic}}",
+      "        pipeline: ${5:pipeline-name}",
+      ""
+    ]
+  },
+  "wf:workflow:statemachine": {
+    "prefix": "wf:workflow:statemachine",
+    "description": "State machine workflow definition",
+    "body": [
+      "${1:fsm}:",
+      "  type: statemachine",
+      "  config:",
+      "    initial: ${2:idle}",
+      "    states:",
+      "      ${2:idle}:",
+      "        on:",
+      "          ${3:start}: ${4:running}",
+      "      ${4:running}:",
+      "        on:",
+      "          ${5:done}: ${6:complete}",
+      ""
+    ]
+  }
+}
