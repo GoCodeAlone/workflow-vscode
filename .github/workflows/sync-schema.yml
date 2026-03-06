@@ -1,0 +1,67 @@
+name: Sync Schema on Workflow Release
+
+on:
+  repository_dispatch:
+    types: [workflow-release]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Update schema and release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install wfctl
+        env:
+          GOPRIVATE: github.com/GoCodeAlone/*
+          GONOSUMCHECK: github.com/GoCodeAlone/*
+          GOFLAGS: -buildvcs=false
+        run: |
+          WORKFLOW_VERSION="${{ github.event.client_payload.version }}"
+          go install "github.com/GoCodeAlone/workflow/cmd/wfctl@${WORKFLOW_VERSION}"
+
+      - name: Regenerate schema
+        run: wfctl schema --output schemas/workflow-config.schema.json
+
+      - name: Render templates
+        run: |
+          export WORKFLOW_VERSION="${{ github.event.client_payload.version }}"
+          envsubst '${WORKFLOW_VERSION}' < README.md.tmpl > README.md
+
+      - name: Bump extension version
+        run: |
+          WORKFLOW_VERSION="${{ github.event.client_payload.version }}"
+          EXT_VERSION="${WORKFLOW_VERSION#v}"
+          npm version "${EXT_VERSION}" --no-git-tag-version
+
+      - name: Install and build
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npm run build
+
+      - name: Commit and tag
+        run: |
+          WORKFLOW_VERSION="${{ github.event.client_payload.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "chore: sync schema and version to workflow ${WORKFLOW_VERSION}"
+          git push
+          git tag "${WORKFLOW_VERSION}"
+          git push origin "${WORKFLOW_VERSION}"

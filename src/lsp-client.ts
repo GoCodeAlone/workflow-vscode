@@ -20,13 +20,13 @@ function getPlatformSuffix(): string {
   const platform = os.platform();
   const arch = os.arch();
   if (platform === 'darwin') {
-    return arch === 'arm64' ? 'darwin_arm64' : 'darwin_amd64';
+    return arch === 'arm64' ? 'darwin-arm64' : 'darwin-amd64';
   }
   if (platform === 'linux') {
-    return arch === 'arm64' ? 'linux_arm64' : 'linux_amd64';
+    return arch === 'arm64' ? 'linux-arm64' : 'linux-amd64';
   }
   if (platform === 'win32') {
-    return 'windows_amd64';
+    return 'windows-amd64';
   }
   throw new Error(`Unsupported platform: ${platform}/${arch}`);
 }
@@ -56,17 +56,20 @@ async function downloadBinary(destPath: string, outputChannel: vscode.OutputChan
 
   const release = JSON.parse(releaseData) as { tag_name: string };
   const tag = release.tag_name;
-  const downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/${tag}/${BINARY_NAME}_${suffix}.tar.gz`;
+  // Release assets are raw binaries: workflow-lsp-server-{os}-{arch}[.exe]
+  const assetName = os.platform() === 'win32'
+    ? `${BINARY_NAME}-${suffix}.exe`
+    : `${BINARY_NAME}-${suffix}`;
+  const downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/${tag}/${assetName}`;
 
   outputChannel.appendLine(`Downloading ${BINARY_NAME} ${tag} from ${downloadUrl}`);
 
   const destDir = path.dirname(destPath);
   fs.mkdirSync(destDir, { recursive: true });
 
-  // Download and extract
-  const tarPath = destPath + '.tar.gz';
+  // Download raw binary
   await new Promise<void>((resolve, reject) => {
-    const file = fs.createWriteStream(tarPath);
+    const file = fs.createWriteStream(destPath);
     https.get(downloadUrl, (res) => {
       if (res.statusCode === 302 || res.statusCode === 301) {
         const location = res.headers.location;
@@ -85,9 +88,6 @@ async function downloadBinary(destPath: string, outputChannel: vscode.OutputChan
     }).on('error', reject);
   });
 
-  // Extract binary from tarball
-  child_process.execSync(`tar -xzf "${tarPath}" -C "${destDir}" "${binaryFileName}"`);
-  fs.unlinkSync(tarPath);
   fs.chmodSync(destPath, 0o755);
 
   outputChannel.appendLine(`${BINARY_NAME} installed to ${destPath}`);
