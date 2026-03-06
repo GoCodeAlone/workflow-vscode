@@ -13,10 +13,6 @@ interface McpConfig {
 }
 
 const MCP_SERVER_KEY = 'workflow';
-const MCP_SERVER_CONFIG: McpServerConfig = {
-  command: 'workflow-mcp-server',
-  args: [],
-};
 
 function getMcpConfigPath(workspaceFolder: vscode.WorkspaceFolder): string {
   return path.join(workspaceFolder.uri.fsPath, '.vscode', 'mcp.json');
@@ -44,7 +40,10 @@ function hasWorkflowServer(config: McpConfig): boolean {
   return !!(config.servers && config.servers[MCP_SERVER_KEY]);
 }
 
-export async function checkAndRegisterMcpServer(outputChannel: vscode.OutputChannel): Promise<void> {
+export async function checkAndRegisterMcpServer(
+  wfctlPath: string,
+  outputChannel: vscode.OutputChannel,
+): Promise<void> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
     return;
@@ -55,7 +54,6 @@ export async function checkAndRegisterMcpServer(outputChannel: vscode.OutputChan
   const currentConfig = readMcpConfig(mcpPath);
 
   if (hasWorkflowServer(currentConfig)) {
-    // Already registered
     return;
   }
 
@@ -67,11 +65,15 @@ export async function checkAndRegisterMcpServer(outputChannel: vscode.OutputChan
   );
 
   if (choice === 'Add') {
+    const mcpConfig: McpServerConfig = {
+      command: wfctlPath,
+      args: ['mcp'],
+    };
     const updated: McpConfig = {
       ...currentConfig,
       servers: {
         ...(currentConfig.servers ?? {}),
-        [MCP_SERVER_KEY]: MCP_SERVER_CONFIG,
+        [MCP_SERVER_KEY]: mcpConfig,
       },
     };
     writeMcpConfig(mcpPath, updated);

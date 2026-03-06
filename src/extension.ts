@@ -1,13 +1,26 @@
 import * as vscode from 'vscode';
 import { startLspClient, stopLspClient } from './lsp-client.js';
-import { registerCommands } from './commands.js';
+import { registerCommands, setWfctlPath } from './commands.js';
 import { checkAndRegisterMcpServer } from './mcp-config.js';
+import { resolveWfctlPath } from './wfctl.js';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel('Workflow');
   context.subscriptions.push(outputChannel);
 
   outputChannel.appendLine('Workflow Engine extension activating...');
+
+  // Resolve wfctl binary (auto-download if needed)
+  let wfctlPath = 'wfctl';
+  try {
+    wfctlPath = await resolveWfctlPath(context, outputChannel);
+    outputChannel.appendLine(`wfctl resolved to: ${wfctlPath}`);
+  } catch (err) {
+    outputChannel.appendLine(`wfctl not available: ${err}. Commands may not work.`);
+  }
+
+  // Set the resolved path for command execution
+  setWfctlPath(wfctlPath);
 
   // Register wfctl command palette commands
   registerCommands(context, outputChannel);
@@ -20,13 +33,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       outputChannel.appendLine('LSP client started.');
     } catch (err) {
       outputChannel.appendLine(`LSP client failed to start: ${err}`);
-      // Non-fatal: extension still provides commands and snippets
     }
   }
 
   // Offer MCP server registration
   if (config.get<boolean>('mcpServer.autoRegister', true)) {
-    await checkAndRegisterMcpServer(outputChannel);
+    await checkAndRegisterMcpServer(wfctlPath, outputChannel);
   }
 
   outputChannel.appendLine('Workflow Engine extension activated.');

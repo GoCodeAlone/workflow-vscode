@@ -80,8 +80,8 @@
       "properties": {
         "workflow.wfctl.path": {
           "type": "string",
-          "default": "wfctl",
-          "description": "Path to the wfctl binary. Defaults to 'wfctl' (must be on PATH)."
+          "default": "",
+          "description": "Path to the wfctl binary. Leave empty to auto-download from GitHub Releases."
         },
         "workflow.lspServer.path": {
           "type": "string",
@@ -96,7 +96,7 @@
         "workflow.mcpServer.autoRegister": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically register the workflow-mcp-server in .vscode/mcp.json on workspace open."
+          "description": "Automatically register wfctl as the MCP server in .vscode/mcp.json on workspace open."
         }
       }
     },

@@ -2,9 +2,10 @@ import * as vscode from 'vscode';
 import * as child_process from 'child_process';
 import * as path from 'path';
 
-function getWfctlPath(): string {
-  const config = vscode.workspace.getConfiguration('workflow');
-  return config.get<string>('wfctl.path', 'wfctl');
+let wfctlBinaryPath = 'wfctl';
+
+export function setWfctlPath(p: string): void {
+  wfctlBinaryPath = p;
 }
 
 function getActiveFilePath(): string | undefined {
@@ -18,7 +19,7 @@ function runWfctl(
   cwd?: string,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const wfctl = getWfctlPath();
+    const wfctl = wfctlBinaryPath;
     const cmd = `${wfctl} ${args.join(' ')}`;
     outputChannel.show(true);
     outputChannel.appendLine(`> ${cmd}`);
@@ -34,7 +35,7 @@ function runWfctl(
     proc.on('error', (err) => {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         vscode.window.showErrorMessage(
-          `wfctl not found at "${wfctl}". Install it from https://github.com/GoCodeAlone/workflow or set workflow.wfctl.path.`,
+          `wfctl not found at "${wfctl}". Install it or set workflow.wfctl.path.`,
         );
       } else {
         vscode.window.showErrorMessage(`wfctl error: ${err.message}`);
@@ -54,7 +55,7 @@ function runWfctl(
 }
 
 function runWfctlInTerminal(args: string[], cwd?: string): void {
-  const wfctl = getWfctlPath();
+  const wfctl = wfctlBinaryPath;
   const terminal = vscode.window.createTerminal({
     name: 'Workflow',
     cwd: cwd ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
@@ -67,7 +68,6 @@ export function registerCommands(
   context: vscode.ExtensionContext,
   outputChannel: vscode.OutputChannel,
 ): void {
-  // workflow.validate — runs wfctl template validate --config <active-file>
   context.subscriptions.push(
     vscode.commands.registerCommand('workflow.validate', async () => {
       const file = getActiveFilePath();
@@ -80,7 +80,6 @@ export function registerCommands(
     }),
   );
 
-  // workflow.inspect — runs wfctl inspect -deps <active-file>
   context.subscriptions.push(
     vscode.commands.registerCommand('workflow.inspect', async () => {
       const file = getActiveFilePath();
@@ -92,7 +91,6 @@ export function registerCommands(
     }),
   );
 
-  // workflow.init — quick pick template then runs wfctl template init
   context.subscriptions.push(
     vscode.commands.registerCommand('workflow.init', async () => {
       const templates = [
@@ -116,7 +114,6 @@ export function registerCommands(
     }),
   );
 
-  // workflow.templateValidate — runs wfctl template validate (no file arg)
   context.subscriptions.push(
     vscode.commands.registerCommand('workflow.templateValidate', async () => {
       const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -124,7 +121,6 @@ export function registerCommands(
     }),
   );
 
-  // workflow.run — runs wfctl run -config <active-file> in a terminal (long-running)
   context.subscriptions.push(
     vscode.commands.registerCommand('workflow.run', () => {
       const file = getActiveFilePath();
@@ -136,16 +132,15 @@ export function registerCommands(
     }),
   );
 
-  // workflow.schema — runs wfctl schema and opens result in editor
   context.subscriptions.push(
     vscode.commands.registerCommand('workflow.schema', async () => {
       const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       outputChannel.show(true);
       outputChannel.appendLine('> wfctl schema');
 
-      const wfctl = getWfctlPath();
+      const wfctl = wfctlBinaryPath;
       child_process.exec(
-        `${wfctl} schema`,
+        `"${wfctl}" schema`,
         { cwd: folder },
         async (err, stdout, stderr) => {
           if (err) {
