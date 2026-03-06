@@ -46,7 +46,12 @@ jobs:
         run: |
           WORKFLOW_VERSION="${{ github.event.client_payload.version }}"
           EXT_VERSION="${WORKFLOW_VERSION#v}"
-          npm version "${EXT_VERSION}" --no-git-tag-version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          if [ "${CURRENT_VERSION}" = "${EXT_VERSION}" ]; then
+            echo "Version already at ${EXT_VERSION}, skipping"
+          else
+            npm version "${EXT_VERSION}" --no-git-tag-version
+          fi
 
       - name: Install and build
         run: |
