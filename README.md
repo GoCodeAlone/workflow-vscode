@@ -2,7 +2,7 @@
 
 IDE support for [Workflow Engine](https://github.com/GoCodeAlone/workflow) configuration files: real-time validation, autocomplete, hover docs, snippets, and AI assistant integration via MCP.
 
-> This extension requires workflow engine v0.3.20 or later.
+> This extension requires workflow engine v0.3.24 or later.
 
 [![VS Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/GoCodeAlone.workflow-engine)](https://marketplace.visualstudio.com/items?itemName=GoCodeAlone.workflow-engine)
 [![VS Marketplace Downloads](https://img.shields.io/visual-studio-marketplace/d/GoCodeAlone.workflow-engine)](https://marketplace.visualstudio.com/items?itemName=GoCodeAlone.workflow-engine)
@@ -77,7 +77,7 @@ All `wfctl` commands are available via the Command Palette (`Ctrl+Shift+P` / `Cm
 
 ### MCP Server Integration
 
-On workspace open, the extension offers to register `workflow-mcp-server` in `.vscode/mcp.json`. This makes Workflow Engine context available to AI assistants that support the [Model Context Protocol](https://modelcontextprotocol.io/):
+On workspace open, the extension offers to register `wfctl mcp` in `.vscode/mcp.json`. This makes Workflow Engine context available to AI assistants that support the [Model Context Protocol](https://modelcontextprotocol.io/):
 
 - **Claude** (VS Code extension or claude.ai/code)
 - **GitHub Copilot** (VS Code)
@@ -129,20 +129,22 @@ Press **F5** in VS Code to launch an Extension Development Host with the extensi
 
 ### wfctl
 
-The `wfctl` CLI is required for the command palette commands (validate, inspect, run, etc.).
+The `wfctl` CLI powers command palette commands and MCP integration. It is downloaded automatically on first activation.
+
+To install manually instead:
 
 ```sh
-go install github.com/GoCodeAlone/workflow/cmd/wfctl@v0.3.20
+go install github.com/GoCodeAlone/workflow/cmd/wfctl@v0.3.24
 ```
 
-Verify: `wfctl --version`
+If you install it manually, set `workflow.wfctl.path` to the binary path so the extension uses your local build instead of auto-downloading.
 
 ### workflow-lsp-server
 
 The LSP server binary powers validation, autocomplete, and hover docs. It is downloaded automatically on first activation. You can also install it manually:
 
 ```sh
-go install github.com/GoCodeAlone/workflow/cmd/workflow-lsp-server@v0.3.20
+go install github.com/GoCodeAlone/workflow/cmd/workflow-lsp-server@v0.3.24
 ```
 
 If you install it manually, set `workflow.lspServer.path` to the binary path so the extension uses your local build instead of auto-downloading.
@@ -155,16 +157,16 @@ All settings are under the `workflow.*` namespace in VS Code settings.
 
 | Setting | Type | Default | Description |
 |---|---|---|---|
-| `workflow.wfctl.path` | `string` | `"wfctl"` | Path to the `wfctl` binary. Defaults to `wfctl` (must be on `PATH`). |
+| `workflow.wfctl.path` | `string` | `""` | Path to the `wfctl` binary. Leave empty to auto-download from GitHub Releases. |
 | `workflow.lspServer.path` | `string` | `""` | Path to the `workflow-lsp-server` binary. Leave empty to auto-download from GitHub Releases. |
 | `workflow.lspServer.enabled` | `boolean` | `true` | Enable the Workflow LSP server for rich language features. |
-| `workflow.mcpServer.autoRegister` | `boolean` | `true` | Automatically register `workflow-mcp-server` in `.vscode/mcp.json` on workspace open. |
+| `workflow.mcpServer.autoRegister` | `boolean` | `true` | Automatically register `wfctl` as the MCP server in `.vscode/mcp.json` on workspace open. |
 
 Example `settings.json`:
 
 ```json
 {
-  "workflow.wfctl.path": "/usr/local/bin/wfctl",
+  "workflow.wfctl.path": "",
   "workflow.lspServer.path": "/usr/local/bin/workflow-lsp-server",
   "workflow.lspServer.enabled": true,
   "workflow.mcpServer.autoRegister": true
@@ -192,14 +194,14 @@ When `workflow.mcpServer.autoRegister` is `true` (the default), the extension ch
 
 > Add the Workflow MCP server to .vscode/mcp.json for AI assistant integration?
 
-Choosing **Add** writes the following entry to `.vscode/mcp.json`:
+Choosing **Add** writes the following entry to `.vscode/mcp.json` (using the resolved `wfctl` binary path):
 
 ```json
 {
   "servers": {
     "workflow": {
-      "command": "workflow-mcp-server",
-      "args": []
+      "command": "/path/to/wfctl",
+      "args": ["mcp"]
     }
   }
 }
@@ -214,12 +216,6 @@ Any tool that reads `.vscode/mcp.json` and speaks the Model Context Protocol wil
 - **Claude** (claude.ai/code or the VS Code extension)
 - **GitHub Copilot** in VS Code (agent mode)
 - **Cursor**
-
-### Installing workflow-mcp-server
-
-```sh
-go install github.com/GoCodeAlone/workflow/cmd/workflow-mcp-server@v0.3.20
-```
 
 ---
 
