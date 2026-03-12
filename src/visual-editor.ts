@@ -64,7 +64,7 @@ export class WorkflowVisualEditorProvider {
 
   private setupDocumentSync() {
     // Watch for text editor changes
-    vscode.workspace.onDidChangeTextDocument((e) => {
+    const docSyncDisposable = vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document === this.document && !this.updatingFromWebview) {
         this.updatingFromEditor = true;
         this.sendYamlToEditor(e.document.getText());
@@ -73,7 +73,7 @@ export class WorkflowVisualEditorProvider {
     });
 
     // Watch for cursor position changes
-    vscode.window.onDidChangeTextEditorSelection((e) => {
+    const cursorSyncDisposable = vscode.window.onDidChangeTextEditorSelection((e) => {
       if (e.textEditor.document === this.document) {
         const pos = e.selections[0].active;
         this.panel?.webview.postMessage({
@@ -82,6 +82,12 @@ export class WorkflowVisualEditorProvider {
           col: pos.character + 1,
         });
       }
+    });
+
+    // Clean up listeners when panel is disposed
+    this.panel!.onDidDispose(() => {
+      docSyncDisposable.dispose();
+      cursorSyncDisposable.dispose();
     });
   }
 

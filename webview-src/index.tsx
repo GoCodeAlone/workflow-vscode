@@ -22,7 +22,7 @@ function App() {
       },
       onSchemasLoaded: (schemas) => {
         if (schemas && typeof schemas === 'object') {
-          loadSchemas(schemas as Record<string, never>);
+          loadSchemas(schemas as Parameters<typeof loadSchemas>[0]);
         }
       },
     });
