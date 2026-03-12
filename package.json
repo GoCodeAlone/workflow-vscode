@@ -119,6 +119,11 @@
           },
           "default": [],
           "description": "Glob patterns for workflow config files (e.g. config/app.yaml)"
+        },
+        "workflow.suppressDetectionPrompt": {
+          "type": "boolean",
+          "default": false,
+          "description": "Don't show detection prompt for workflow YAML files"
         }
       }
     },
