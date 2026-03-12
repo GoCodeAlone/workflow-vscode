@@ -3,7 +3,7 @@ import { startLspClient, stopLspClient } from './lsp-client.js';
 import { registerCommands, setWfctlPath } from './commands.js';
 import { checkAndRegisterMcpServer } from './mcp-config.js';
 import { resolveWfctlPath } from './wfctl.js';
-import { WorkflowVisualEditorProvider, isWorkflowFile } from './visual-editor.js';
+import { WorkflowVisualEditorProvider, isWorkflowFile, promptWorkflowDetection } from './visual-editor.js';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel('Workflow');
@@ -34,6 +34,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (editor && isWorkflowFile(editor.document)) {
         editorProvider.open(editor.document);
       }
+    })
+  );
+
+  // Show detection prompt when a YAML file is opened
+  context.subscriptions.push(
+    vscode.workspace.onDidOpenTextDocument((doc) => {
+      if (doc.languageId === 'yaml') promptWorkflowDetection(doc);
     })
   );
 

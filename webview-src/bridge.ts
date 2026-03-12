@@ -11,6 +11,7 @@ export interface BridgeCallbacks {
   onYamlChanged: (content: string) => void;
   onCursorMoved: (line: number, col: number) => void;
   onSchemasLoaded: (schemas: unknown) => void;
+  onPluginSchemasLoaded?: (plugins: unknown[]) => void;
 }
 
 let callbacks: BridgeCallbacks | null = null;
@@ -29,6 +30,9 @@ export function initBridge(cb: BridgeCallbacks) {
         break;
       case 'schemasLoaded':
         callbacks?.onSchemasLoaded(msg.schemas);
+        break;
+      case 'pluginSchemasLoaded':
+        callbacks?.onPluginSchemasLoaded?.(msg.plugins ?? []);
         break;
     }
   });

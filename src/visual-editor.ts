@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { discoverPluginSchemas } from './plugin-discovery';
 
 export class WorkflowVisualEditorProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -122,7 +123,7 @@ export class WorkflowVisualEditorProvider {
     }
   }
 
-  private sendSchemas() {
+  private async sendSchemas() {
     const schemaPath = path.join(this.context.extensionPath, 'schemas', 'workflow-config.schema.json');
     try {
       const content = fs.readFileSync(schemaPath, 'utf-8');
@@ -130,6 +131,14 @@ export class WorkflowVisualEditorProvider {
       this.panel?.webview.postMessage({ type: 'schemasLoaded', schemas: schema });
     } catch {
       // Schema file not available — editor degrades gracefully
+    }
+
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspaceRoot) {
+      const plugins = await discoverPluginSchemas(workspaceRoot, this.context.globalStorageUri);
+      if (plugins.length > 0) {
+        this.panel?.webview.postMessage({ type: 'pluginSchemasLoaded', plugins });
+      }
     }
   }
 
@@ -159,19 +168,47 @@ export class WorkflowVisualEditorProvider {
   }
 }
 
-export function isWorkflowFile(document: vscode.TextDocument): boolean {
-  // Layer 1: explicit configPaths setting
-  const configPaths: string[] = vscode.workspace.getConfiguration('workflow').get('configPaths', []);
-  if (configPaths.length > 0) {
-    const relative = vscode.workspace.asRelativePath(document.uri);
-    for (const pattern of configPaths) {
-      if (vscode.languages.match({ pattern }, document) > 0) return true;
-    }
+function isExplicitMatch(document: vscode.TextDocument, configPaths: string[]): boolean {
+  if (configPaths.length === 0) return false;
+  for (const pattern of configPaths) {
+    if (vscode.languages.match({ pattern }, document) > 0) return true;
   }
+  return false;
+}
 
-  // Layer 2: content detection
-  const text = document.getText(new vscode.Range(0, 0, 50, 0));
-  return /^modules:/m.test(text) && /^workflows:/m.test(text);
+function isContentMatch(document: vscode.TextDocument): boolean {
+  const text = document.getText();
+  return text.includes('modules:') && text.includes('workflows:');
+}
+
+export function isWorkflowFile(document: vscode.TextDocument): boolean {
+  const configPaths: string[] = vscode.workspace.getConfiguration('workflow').get('configPaths', []);
+  return isExplicitMatch(document, configPaths) || isContentMatch(document);
+}
+
+export function promptWorkflowDetection(document: vscode.TextDocument) {
+  if (document.languageId !== 'yaml') return;
+  const configPaths: string[] = vscode.workspace.getConfiguration('workflow').get('configPaths', []);
+  if (isExplicitMatch(document, configPaths)) return;
+  if (vscode.workspace.getConfiguration('workflow').get('suppressDetectionPrompt', false)) return;
+  if (!isContentMatch(document)) return;
+
+  vscode.window.showInformationMessage(
+    'This looks like a Workflow config. Open the visual editor?',
+    'Open Visual Editor',
+    'Always for this file',
+    "Don't ask again"
+  ).then((choice) => {
+    if (choice === 'Open Visual Editor') {
+      vscode.commands.executeCommand('workflow.openVisualEditor');
+    } else if (choice === 'Always for this file') {
+      const config = vscode.workspace.getConfiguration('workflow');
+      const paths: string[] = config.get('configPaths', []);
+      config.update('configPaths', [...paths, document.uri.fsPath], vscode.ConfigurationTarget.Workspace);
+    } else if (choice === "Don't ask again") {
+      vscode.workspace.getConfiguration('workflow').update('suppressDetectionPrompt', true, vscode.ConfigurationTarget.Global);
+    }
+  });
 }
 
 function getNonce(): string {

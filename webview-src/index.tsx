@@ -2,31 +2,52 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { WorkflowEditor } from '@gocodealone/workflow-editor';
 import { useModuleSchemaStore } from '@gocodealone/workflow-editor/stores';
+import { useWorkflowStore } from '@gocodealone/workflow-editor/stores';
+import { buildYamlLineMap } from '@gocodealone/workflow-editor/utils';
 import { initBridge, sendYamlUpdated, sendNavigateToLine } from './bridge';
 import '@xyflow/react/dist/style.css';
 
 function App() {
   const [yaml, setYaml] = useState<string>('');
   const initializedRef = useRef(false);
+  const yamlRef = useRef<string>('');
 
   const loadSchemas = useModuleSchemaStore((s) => s.loadSchemas);
+  const loadPluginSchemas = useModuleSchemaStore((s) => s.loadPluginSchemas);
+  const setHighlightedNode = useWorkflowStore((s) => s.setHighlightedNode);
 
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
     initBridge({
-      onYamlChanged: (content) => setYaml(content),
-      onCursorMoved: (_line, _col) => {
-        // TODO: highlight corresponding node in editor
+      onYamlChanged: (content) => {
+        yamlRef.current = content;
+        setYaml(content);
+      },
+      onCursorMoved: (line, _col) => {
+        const lineMap = buildYamlLineMap(yamlRef.current);
+        let found: string | null = null;
+        for (const [nodeId, range] of Object.entries(lineMap)) {
+          if (line >= range.startLine && line <= range.endLine) {
+            found = nodeId;
+            break;
+          }
+        }
+        setHighlightedNode(found);
       },
       onSchemasLoaded: (schemas) => {
         if (schemas && typeof schemas === 'object') {
           loadSchemas(schemas as Parameters<typeof loadSchemas>[0]);
         }
       },
+      onPluginSchemasLoaded: (plugins) => {
+        if (Array.isArray(plugins)) {
+          loadPluginSchemas(plugins as Parameters<typeof loadPluginSchemas>[0]);
+        }
+      },
     });
-  }, [loadSchemas]);
+  }, [loadSchemas, loadPluginSchemas, setHighlightedNode]);
 
   return (
     <WorkflowEditor
