@@ -1,4 +1,5 @@
 src/**
+webview-src/**
 node_modules/**
 .github/**
 .gitignore

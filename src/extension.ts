@@ -3,6 +3,7 @@ import { startLspClient, stopLspClient } from './lsp-client.js';
 import { registerCommands, setWfctlPath } from './commands.js';
 import { checkAndRegisterMcpServer } from './mcp-config.js';
 import { resolveWfctlPath } from './wfctl.js';
+import { WorkflowVisualEditorProvider, isWorkflowFile } from './visual-editor.js';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel('Workflow');
@@ -24,6 +25,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Register wfctl command palette commands
   registerCommands(context, outputChannel);
+
+  // Register visual editor
+  const editorProvider = new WorkflowVisualEditorProvider(context);
+  context.subscriptions.push(
+    vscode.commands.registerCommand('workflow.openVisualEditor', () => {
+      const editor = vscode.window.activeTextEditor;
+      if (editor && isWorkflowFile(editor.document)) {
+        editorProvider.open(editor.document);
+      }
+    })
+  );
 
   // Start the LSP client if enabled
   const config = vscode.workspace.getConfiguration('workflow');
