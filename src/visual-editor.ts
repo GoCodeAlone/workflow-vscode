@@ -58,6 +58,12 @@ export class WorkflowVisualEditorProvider {
         case 'aiRequest':
           this.handleAIRequest(msg.yaml, msg.moduleTypes, msg.userPrompt);
           break;
+        case 'resolveFile':
+          this.handleResolveFile(msg.requestId, msg.relativePath);
+          break;
+        case 'saveFiles':
+          this.handleSaveFiles(msg.entries);
+          break;
         case 'ready':
           this.sendYamlToEditor(this.document!.getText());
           this.sendSchemas();
@@ -191,6 +197,52 @@ Rules:
       this.panel?.webview.postMessage({ type: 'aiResponse', content: result });
     } catch (e: any) {
       vscode.window.showErrorMessage(`AI request failed: ${e.message || e}`);
+    }
+  }
+
+  private async handleResolveFile(requestId: string, relativePath: string) {
+    if (!this.document) {
+      this.panel?.webview.postMessage({ type: 'resolveFileResponse', requestId, content: null });
+      return;
+    }
+    try {
+      const docDir = path.dirname(this.document.uri.fsPath);
+      const targetPath = path.resolve(docDir, relativePath);
+      const content = fs.readFileSync(targetPath, 'utf-8');
+      this.panel?.webview.postMessage({ type: 'resolveFileResponse', requestId, content });
+    } catch {
+      this.panel?.webview.postMessage({ type: 'resolveFileResponse', requestId, content: null });
+    }
+  }
+
+  private async handleSaveFiles(entries: Array<{ path: string | null; content: string }>) {
+    if (!this.document) return;
+    const docDir = path.dirname(this.document.uri.fsPath);
+
+    for (const entry of entries) {
+      if (entry.path === null) {
+        // Main file — update the open document
+        this.updatingFromWebview = true;
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(
+          this.document.uri,
+          new vscode.Range(0, 0, this.document.lineCount, 0),
+          entry.content
+        );
+        await vscode.workspace.applyEdit(edit);
+        this.updatingFromWebview = false;
+      } else {
+        // Imported file — write to disk
+        const targetPath = path.resolve(docDir, entry.path);
+        const targetUri = vscode.Uri.file(targetPath);
+        const encoder = new TextEncoder();
+        // Ensure parent directory exists
+        const targetDir = path.dirname(targetPath);
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+        await vscode.workspace.fs.writeFile(targetUri, encoder.encode(entry.content));
+      }
     }
   }
 

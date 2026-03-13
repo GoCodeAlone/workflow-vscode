@@ -4,7 +4,7 @@ import { WorkflowEditor } from '@gocodealone/workflow-editor';
 import { useModuleSchemaStore } from '@gocodealone/workflow-editor/stores';
 import { useWorkflowStore } from '@gocodealone/workflow-editor/stores';
 import { buildYamlLineMap, parseYaml, parseYamlSafe, configToYaml } from '@gocodealone/workflow-editor/utils';
-import { initBridge, sendYamlUpdated, sendNavigateToLine, sendAIRequest } from './bridge';
+import { initBridge, sendYamlUpdated, sendNavigateToLine, sendAIRequest, sendResolveFile, sendSaveFiles } from './bridge';
 import '@xyflow/react/dist/style.css';
 
 function App() {
@@ -87,8 +87,15 @@ function App() {
     <WorkflowEditor
       initialYaml={yaml}
       onChange={(newYaml) => sendYamlUpdated(newYaml)}
-      onSave={async (newYaml) => sendYamlUpdated(newYaml)}
+      onSave={async (newYaml, fileMap) => {
+        if (fileMap && fileMap.size > 0) {
+          sendSaveFiles(fileMap);
+        } else {
+          sendYamlUpdated(newYaml);
+        }
+      }}
       onNavigateToSource={(line, col) => sendNavigateToLine(line, col)}
+      onResolveFile={(relativePath) => sendResolveFile(relativePath)}
       onSchemaRequest={async () => {
         // Schemas arrive async via bridge callback; return null to skip direct loading
         return null;
