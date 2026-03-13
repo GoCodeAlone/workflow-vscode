@@ -155,7 +155,6 @@ export async function startLspClient(
       { scheme: 'file', language: 'yaml', pattern: '**/workflow.yml' },
       { scheme: 'file', language: 'yaml', pattern: '**/app.yaml' },
       { scheme: 'file', language: 'yaml', pattern: '**/app.yml' },
-      { scheme: 'file', language: 'workflow-yaml' },
     ],
     synchronize: {
       fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{yaml,yml}'),

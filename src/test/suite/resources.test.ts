@@ -9,6 +9,9 @@ import * as fs from 'fs';
  */
 suite('Extension Resources', () => {
   const extensionRoot = path.resolve(__dirname, '..', '..', '..');
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.join(extensionRoot, 'package.json'), 'utf-8'),
+  );
 
   test('webview-dist/index.js exists', () => {
     const filePath = path.join(extensionRoot, 'webview-dist', 'index.js');
@@ -53,6 +56,22 @@ suite('Extension Resources', () => {
     const filePath = path.join(extensionRoot, 'snippets', 'workflow.json');
     const content = fs.readFileSync(filePath, 'utf-8');
     JSON.parse(content); // Throws if invalid
+  });
+
+  test('no custom language ID without a grammar', () => {
+    const languages = packageJson.contributes.languages || [];
+    const grammars = packageJson.contributes.grammars || [];
+
+    for (const lang of languages) {
+      if (lang.id === 'yaml' || lang.id === 'json') continue;
+      const hasGrammar = grammars.some(
+        (g: { language: string }) => g.language === lang.id,
+      );
+      assert.ok(
+        hasGrammar,
+        `Language "${lang.id}" declared without a TextMate grammar — will lose syntax highlighting`,
+      );
+    }
   });
 
   test('language-configuration.json exists', () => {
