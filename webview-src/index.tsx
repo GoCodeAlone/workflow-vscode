@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { WorkflowEditor } from '@gocodealone/workflow-editor';
 import { useModuleSchemaStore } from '@gocodealone/workflow-editor/stores';
 import { useWorkflowStore } from '@gocodealone/workflow-editor/stores';
-import { buildYamlLineMap, parseYaml, parseYamlSafe, configToYaml } from '@gocodealone/workflow-editor/utils';
+import { buildYamlLineMap, parseYaml, parseYamlSafe } from '@gocodealone/workflow-editor/utils';
 import { initBridge, sendYamlUpdated, sendNavigateToLine, sendAIRequest, sendResolveFile, sendSaveFiles } from './bridge';
 import '@xyflow/react/dist/style.css';
 
@@ -17,19 +17,9 @@ function App() {
   const loadPluginSchemas = useModuleSchemaStore((s) => s.loadPluginSchemas);
   const setHighlightedNode = useWorkflowStore((s) => s.setHighlightedNode);
   const importFromConfig = useWorkflowStore((s) => s.importFromConfig);
-  const exportToConfig = useWorkflowStore((s) => s.exportToConfig);
 
-  // Subscribe to store changes and send YAML back to host
-  useEffect(() => {
-    const unsub = useWorkflowStore.subscribe(() => {
-      if (fromHostRef.current) return;
-      const config = exportToConfig();
-      const newYaml = configToYaml(config);
-      yamlRef.current = newYaml;
-      sendYamlUpdated(newYaml);
-    });
-    return unsub;
-  }, [exportToConfig]);
+  // Bidirectional sync: store changes → YAML → host is handled by onChange prop on WorkflowEditor.
+  // fromHostRef prevents echo loops when host sends YAML that triggers store updates.
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -86,7 +76,11 @@ function App() {
   return (
     <WorkflowEditor
       initialYaml={yaml}
-      onChange={(newYaml) => sendYamlUpdated(newYaml)}
+      onChange={(newYaml) => {
+        if (fromHostRef.current) return;
+        yamlRef.current = newYaml;
+        sendYamlUpdated(newYaml);
+      }}
       onSave={async (newYaml, fileMap) => {
         if (fileMap && fileMap.size > 0) {
           sendSaveFiles(fileMap);
