@@ -74,6 +74,29 @@ suite('Extension Resources', () => {
     }
   });
 
+  test('schema validation targets YAML files correctly', () => {
+    const jsonValidation = packageJson.contributes.jsonValidation || [];
+    for (const entry of jsonValidation) {
+      for (const pattern of entry.fileMatch) {
+        assert.ok(
+          !pattern.endsWith('.yaml') && !pattern.endsWith('.yml'),
+          `jsonValidation has YAML pattern "${pattern}" — jsonValidation only works for JSON files`,
+        );
+      }
+    }
+  });
+
+  test('yamlValidation is configured for workflow files', () => {
+    const yamlValidation = packageJson.contributes.yamlValidation || [];
+    assert.ok(
+      yamlValidation.length > 0,
+      'Must have yamlValidation entries for workflow YAML files',
+    );
+    const patterns = yamlValidation.flatMap((e: { fileMatch: string[] }) => e.fileMatch);
+    assert.ok(patterns.some((p: string) => p.includes('workflow.yaml')), 'Must match workflow.yaml');
+    assert.ok(patterns.some((p: string) => p.includes('app.yaml')), 'Must match app.yaml');
+  });
+
   test('language-configuration.json exists', () => {
     const filePath = path.join(extensionRoot, 'language-configuration.json');
     assert.ok(fs.existsSync(filePath), `Expected ${filePath} to exist`);

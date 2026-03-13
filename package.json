@@ -32,6 +32,7 @@
     "workspaceContains:**/app.yml"
   ],
   "main": "./out/extension.js",
+  "extensionDependencies": ["redhat.vscode-yaml"],
   "contributes": {
     "commands": [
       {
@@ -111,7 +112,7 @@
         }
       }
     },
-    "jsonValidation": [
+    "yamlValidation": [
       {
         "fileMatch": [
           "workflow.yaml",
