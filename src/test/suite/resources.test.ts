@@ -97,6 +97,19 @@ suite('Extension Resources', () => {
     assert.ok(patterns.some((p: string) => p.includes('app.yaml')), 'Must match app.yaml');
   });
 
+  test('LSP startup is non-blocking in extension.ts', () => {
+    const extensionSrc = fs.readFileSync(
+      path.join(extensionRoot, 'out', 'extension.js'),
+      'utf-8',
+    );
+    // The LSP startup should use .catch() pattern, not await
+    // Check that startLspClient is NOT preceded by await on the same expression
+    assert.ok(
+      !extensionSrc.includes('await startLspClient'),
+      'startLspClient should not be awaited — use .catch() for non-blocking startup',
+    );
+  });
+
   test('language-configuration.json exists', () => {
     const filePath = path.join(extensionRoot, 'language-configuration.json');
     assert.ok(fs.existsSync(filePath), `Expected ${filePath} to exist`);

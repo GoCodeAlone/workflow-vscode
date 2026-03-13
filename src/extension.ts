@@ -44,15 +44,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     })
   );
 
-  // Start the LSP client if enabled
+  // Start the LSP client if enabled (non-blocking)
   const config = vscode.workspace.getConfiguration('workflow');
   if (config.get<boolean>('lspServer.enabled', true)) {
-    try {
-      await startLspClient(context, outputChannel);
-      outputChannel.appendLine('LSP client started.');
-    } catch (err) {
-      outputChannel.appendLine(`LSP client failed to start: ${err}`);
-    }
+    startLspClient(context, outputChannel).catch((err) => {
+      outputChannel.appendLine(`LSP client not started: ${err}`);
+    });
   }
 
   // Offer MCP server registration
