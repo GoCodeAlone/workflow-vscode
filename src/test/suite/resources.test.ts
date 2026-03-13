@@ -1,0 +1,62 @@
+import * as assert from 'assert';
+import * as path from 'path';
+import * as fs from 'fs';
+
+/**
+ * Validates that all extension resources are bundled correctly.
+ * Equivalent to the JetBrains EditorResourcesTest — these tests
+ * catch missing/broken resource files before release.
+ */
+suite('Extension Resources', () => {
+  const extensionRoot = path.resolve(__dirname, '..', '..', '..');
+
+  test('webview-dist/index.js exists', () => {
+    const filePath = path.join(extensionRoot, 'webview-dist', 'index.js');
+    assert.ok(fs.existsSync(filePath), `Expected ${filePath} to exist`);
+  });
+
+  test('webview-dist/index.css exists', () => {
+    const filePath = path.join(extensionRoot, 'webview-dist', 'index.css');
+    assert.ok(fs.existsSync(filePath), `Expected ${filePath} to exist`);
+  });
+
+  test('webview-dist/index.js is not empty', () => {
+    const filePath = path.join(extensionRoot, 'webview-dist', 'index.js');
+    const stat = fs.statSync(filePath);
+    assert.ok(stat.size > 1000, `index.js should be > 1KB, got ${stat.size}`);
+  });
+
+  test('webview-dist/index.css is not empty', () => {
+    const filePath = path.join(extensionRoot, 'webview-dist', 'index.css');
+    const stat = fs.statSync(filePath);
+    assert.ok(stat.size > 100, `index.css should be > 100 bytes, got ${stat.size}`);
+  });
+
+  test('schemas/workflow-config.schema.json exists', () => {
+    const filePath = path.join(extensionRoot, 'schemas', 'workflow-config.schema.json');
+    assert.ok(fs.existsSync(filePath), `Expected ${filePath} to exist`);
+  });
+
+  test('schema is valid JSON with $schema key', () => {
+    const filePath = path.join(extensionRoot, 'schemas', 'workflow-config.schema.json');
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const schema = JSON.parse(content);
+    assert.ok(schema['$schema'], 'Schema must have a $schema key');
+  });
+
+  test('snippets/workflow.json exists', () => {
+    const filePath = path.join(extensionRoot, 'snippets', 'workflow.json');
+    assert.ok(fs.existsSync(filePath), `Expected ${filePath} to exist`);
+  });
+
+  test('snippets/workflow.json is valid JSON', () => {
+    const filePath = path.join(extensionRoot, 'snippets', 'workflow.json');
+    const content = fs.readFileSync(filePath, 'utf-8');
+    JSON.parse(content); // Throws if invalid
+  });
+
+  test('language-configuration.json exists', () => {
+    const filePath = path.join(extensionRoot, 'language-configuration.json');
+    assert.ok(fs.existsSync(filePath), `Expected ${filePath} to exist`);
+  });
+});
