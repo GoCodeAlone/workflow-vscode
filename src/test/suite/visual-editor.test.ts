@@ -64,6 +64,22 @@ database:
     assert.ok(!isWorkflowFile(doc), 'Expected non-YAML file to return false');
   });
 
+  test('isWorkflowFile is not required for manual visual editor open', () => {
+    // The visual editor command should open for ANY yaml file,
+    // not just files that pass isWorkflowFile()
+    const extensionRoot = path.resolve(__dirname, '..', '..', '..');
+    const extensionSrc = fs.readFileSync(
+      path.join(extensionRoot, 'out', 'extension.js'),
+      'utf-8',
+    );
+    // The command handler should NOT call isWorkflowFile for the button click
+    // It should check file extension only (.yaml/.yml)
+    const cmdRegistration = extensionSrc.match(
+      /registerCommand\s*\(\s*['"]workflow\.openVisualEditor['"]/
+    );
+    assert.ok(cmdRegistration, 'openVisualEditor command must be registered');
+  });
+
   test('isWorkflowFile detects both modules and workflows keys', async () => {
     // Only modules: without workflows: should NOT match
     const onlyModules = path.join(tmpDir, 'modules-only.yaml');

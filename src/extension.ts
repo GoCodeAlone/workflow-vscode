@@ -31,7 +31,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.commands.registerCommand('workflow.openVisualEditor', () => {
       const editor = vscode.window.activeTextEditor;
-      if (editor && isWorkflowFile(editor.document)) {
+      if (editor && (editor.document.fileName.endsWith('.yaml') || editor.document.fileName.endsWith('.yml'))) {
         editorProvider.open(editor.document);
       }
     })
