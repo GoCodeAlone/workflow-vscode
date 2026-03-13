@@ -2,7 +2,7 @@
   "name": "workflow-engine",
   "displayName": "Workflow Engine",
   "description": "IDE support for Workflow Engine configs — validation, autocomplete, snippets, and AI integration",
-  "version": "0.3.4002",
+  "version": "0.3.4003",
   "publisher": "GoCodeAlone",
   "license": "MIT",
   "repository": {
