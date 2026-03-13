@@ -7,4 +7,5 @@ tsconfig.json
 esbuild.config.js
 **/*.map
 **/*.ts
+**/*.tmpl
 !src/extension.ts
