@@ -152,7 +152,22 @@ export class WorkflowVisualEditorProvider {
   }
 
   private async handleAIRequest(currentYaml: string, moduleTypes: string[], userPrompt: string) {
-    // Use VS Code Language Model API (Copilot) if available (VS Code 1.90+)
+    // Empty userPrompt means IDE embedded mode — open Copilot chat with context on clipboard
+    if (!userPrompt) {
+      const context = `You are a Workflow Engine configuration expert.\nAvailable module types: ${moduleTypes.join(', ')}\nReturn ONLY the complete updated YAML config. No explanations, no markdown fences.\n\nCurrent workflow YAML:\n\`\`\`yaml\n${currentYaml}\n\`\`\``;
+      await vscode.env.clipboard.writeText(context);
+      try {
+        await vscode.commands.executeCommand('workbench.action.chat.open');
+      } catch {
+        // Chat panel may not be available
+      }
+      vscode.window.showInformationMessage(
+        'Workflow context copied to clipboard. Paste into Copilot chat and describe what you\'d like to change.'
+      );
+      return;
+    }
+
+    // Non-empty userPrompt — use Language Model API directly
     const lm = (vscode as any).lm;
     if (!lm?.selectChatModels) {
       vscode.window.showWarningMessage(
