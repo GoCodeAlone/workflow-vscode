@@ -4,7 +4,8 @@ import { WorkflowEditor } from '@gocodealone/workflow-editor';
 import { useModuleSchemaStore } from '@gocodealone/workflow-editor/stores';
 import { useWorkflowStore } from '@gocodealone/workflow-editor/stores';
 import { buildYamlLineMap } from '@gocodealone/workflow-editor/utils';
-import { initBridge, sendYamlUpdated, sendNavigateToLine } from './bridge';
+import { parseYaml } from '@gocodealone/workflow-editor/utils';
+import { initBridge, sendYamlUpdated, sendNavigateToLine, sendAIRequest } from './bridge';
 import '@xyflow/react/dist/style.css';
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
   const loadSchemas = useModuleSchemaStore((s) => s.loadSchemas);
   const loadPluginSchemas = useModuleSchemaStore((s) => s.loadPluginSchemas);
   const setHighlightedNode = useWorkflowStore((s) => s.setHighlightedNode);
+  const importFromConfig = useWorkflowStore((s) => s.importFromConfig);
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -46,8 +48,20 @@ function App() {
           loadPluginSchemas(plugins as Parameters<typeof loadPluginSchemas>[0]);
         }
       },
+      onAIResponse: (content) => {
+        try {
+          const config = parseYaml(content);
+          importFromConfig(config);
+          const newYaml = content;
+          yamlRef.current = newYaml;
+          setYaml(newYaml);
+          sendYamlUpdated(newYaml);
+        } catch (e) {
+          console.error('Failed to parse AI response:', e);
+        }
+      },
     });
-  }, [loadSchemas, loadPluginSchemas, setHighlightedNode]);
+  }, [loadSchemas, loadPluginSchemas, setHighlightedNode, importFromConfig]);
 
   return (
     <WorkflowEditor
@@ -59,6 +73,8 @@ function App() {
         // Schemas arrive async via bridge callback; return null to skip direct loading
         return null;
       }}
+      embedded
+      onAIRequest={(ctx) => sendAIRequest(ctx.yaml, ctx.moduleTypes, ctx.userPrompt)}
     />
   );
 }

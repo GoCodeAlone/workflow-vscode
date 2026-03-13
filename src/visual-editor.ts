@@ -55,6 +55,9 @@ export class WorkflowVisualEditorProvider {
         case 'requestSchemas':
           this.sendSchemas();
           break;
+        case 'aiRequest':
+          this.handleAIRequest(msg.yaml, msg.moduleTypes, msg.userPrompt);
+          break;
         case 'ready':
           this.sendYamlToEditor(this.document!.getText());
           this.sendSchemas();
@@ -139,6 +142,55 @@ export class WorkflowVisualEditorProvider {
       if (plugins.length > 0) {
         this.panel?.webview.postMessage({ type: 'pluginSchemasLoaded', plugins });
       }
+    }
+  }
+
+  private async handleAIRequest(currentYaml: string, moduleTypes: string[], userPrompt: string) {
+    // Use VS Code Language Model API (Copilot) if available (VS Code 1.90+)
+    const lm = (vscode as any).lm;
+    if (!lm?.selectChatModels) {
+      vscode.window.showWarningMessage(
+        'AI-assisted design requires VS Code 1.90+ with GitHub Copilot installed.'
+      );
+      return;
+    }
+
+    try {
+      const models = await lm.selectChatModels();
+      if (!models || models.length === 0) {
+        vscode.window.showWarningMessage(
+          'No AI models available. Please install GitHub Copilot extension.'
+        );
+        return;
+      }
+
+      const model = models[0];
+      const systemPrompt = `You are a Workflow Engine configuration assistant. You modify YAML configurations for the GoCodeAlone/workflow engine.
+
+Available module types: ${moduleTypes.join(', ')}
+
+Rules:
+- Output ONLY valid workflow YAML — no markdown fences, no explanation
+- Preserve existing modules unless the user asks to remove them
+- Use proper module names (lowercase, hyphenated)
+- Each module needs: name, type, and config (if required)`;
+
+      const messages = [
+        (vscode as any).LanguageModelChatMessage.User(`${systemPrompt}\n\nCurrent workflow YAML:\n\`\`\`yaml\n${currentYaml}\n\`\`\`\n\nUser request: ${userPrompt}`),
+      ];
+
+      const response = await model.sendRequest(messages);
+      let result = '';
+      for await (const chunk of response.text) {
+        result += chunk;
+      }
+
+      // Strip markdown fences if the model wraps the output
+      result = result.replace(/^```ya?ml\n?/m, '').replace(/\n?```\s*$/m, '').trim();
+
+      this.panel?.webview.postMessage({ type: 'aiResponse', content: result });
+    } catch (e: any) {
+      vscode.window.showErrorMessage(`AI request failed: ${e.message || e}`);
     }
   }
 

@@ -12,6 +12,7 @@ export interface BridgeCallbacks {
   onCursorMoved: (line: number, col: number) => void;
   onSchemasLoaded: (schemas: unknown) => void;
   onPluginSchemasLoaded?: (plugins: unknown[]) => void;
+  onAIResponse?: (content: string) => void;
 }
 
 let callbacks: BridgeCallbacks | null = null;
@@ -34,6 +35,9 @@ export function initBridge(cb: BridgeCallbacks) {
       case 'pluginSchemasLoaded':
         callbacks?.onPluginSchemasLoaded?.(msg.plugins ?? []);
         break;
+      case 'aiResponse':
+        callbacks?.onAIResponse?.(msg.content);
+        break;
     }
   });
 
@@ -51,4 +55,8 @@ export function sendNavigateToLine(line: number, col: number) {
 
 export function sendRequestSchemas() {
   vscode.postMessage({ type: 'requestSchemas' });
+}
+
+export function sendAIRequest(yaml: string, moduleTypes: string[], userPrompt: string) {
+  vscode.postMessage({ type: 'aiRequest', yaml, moduleTypes, userPrompt });
 }
