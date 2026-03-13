@@ -2,6 +2,29 @@ import * as vscode from 'vscode';
 import * as child_process from 'child_process';
 import * as path from 'path';
 
+/**
+ * Command specifications mapping VS Code command IDs to wfctl arguments.
+ * Exported for testing.
+ */
+export const COMMAND_SPECS: Record<string, { args: (filePath?: string) => string[]; useTerminal?: boolean }> = {
+  'workflow.validate': {
+    args: (f) => f ? ['template', 'validate', '--config', f] : ['template', 'validate'],
+  },
+  'workflow.inspect': {
+    args: (f) => f ? ['inspect', '-deps', f] : ['inspect', '-deps'],
+  },
+  'workflow.templateValidate': {
+    args: () => ['template', 'validate'],
+  },
+  'workflow.run': {
+    args: (f) => f ? ['run', '-config', f] : ['run'],
+    useTerminal: true,
+  },
+  'workflow.schema': {
+    args: () => ['schema'],
+  },
+};
+
 let wfctlBinaryPath = 'wfctl';
 
 export function setWfctlPath(p: string): void {

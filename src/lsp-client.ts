@@ -31,6 +31,14 @@ function getPlatformSuffix(): string {
   throw new Error(`Unsupported platform: ${platform}/${arch}`);
 }
 
+export function buildLspDownloadUrl(tag: string): string {
+  const suffix = getPlatformSuffix();
+  const binaryFileName = os.platform() === 'win32' ? `${BINARY_NAME}-${suffix}.exe` : `${BINARY_NAME}-${suffix}`;
+  return `https://github.com/${GITHUB_REPO}/releases/download/${tag}/${binaryFileName}`;
+}
+
+export { getPlatformSuffix as getLspPlatformSuffix };
+
 function getDefaultBinaryPath(context: vscode.ExtensionContext): string {
   const suffix = getPlatformSuffix();
   const binaryFileName = os.platform() === 'win32' ? `${BINARY_NAME}.exe` : BINARY_NAME;
@@ -137,6 +145,13 @@ async function resolveLspBinaryPath(
   throw new Error('LSP disabled by user.');
 }
 
+export const LSP_DOCUMENT_SELECTOR = [
+  { scheme: 'file', language: 'yaml', pattern: '**/workflow.yaml' },
+  { scheme: 'file', language: 'yaml', pattern: '**/workflow.yml' },
+  { scheme: 'file', language: 'yaml', pattern: '**/app.yaml' },
+  { scheme: 'file', language: 'yaml', pattern: '**/app.yml' },
+] as const;
+
 export async function startLspClient(
   context: vscode.ExtensionContext,
   outputChannel: vscode.OutputChannel,
@@ -150,12 +165,7 @@ export async function startLspClient(
   };
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [
-      { scheme: 'file', language: 'yaml', pattern: '**/workflow.yaml' },
-      { scheme: 'file', language: 'yaml', pattern: '**/workflow.yml' },
-      { scheme: 'file', language: 'yaml', pattern: '**/app.yaml' },
-      { scheme: 'file', language: 'yaml', pattern: '**/app.yml' },
-    ],
+    documentSelector: [...LSP_DOCUMENT_SELECTOR],
     synchronize: {
       fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{yaml,yml}'),
     },

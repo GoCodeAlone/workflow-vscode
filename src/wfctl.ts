@@ -7,7 +7,7 @@ import * as https from 'https';
 const GITHUB_REPO = 'GoCodeAlone/workflow';
 const BINARY_NAME = 'wfctl';
 
-function getPlatformSuffix(): string {
+export function getPlatformSuffix(): string {
   const platform = os.platform();
   const arch = os.arch();
   if (platform === 'darwin') {
@@ -20,6 +20,12 @@ function getPlatformSuffix(): string {
     return 'windows-amd64';
   }
   throw new Error(`Unsupported platform: ${platform}/${arch}`);
+}
+
+export function buildDownloadUrl(binaryName: string, tag: string): string {
+  const suffix = getPlatformSuffix();
+  const assetName = os.platform() === 'win32' ? `${binaryName}-${suffix}.exe` : `${binaryName}-${suffix}`;
+  return `https://github.com/${GITHUB_REPO}/releases/download/${tag}/${assetName}`;
 }
 
 function getDefaultBinaryPath(context: vscode.ExtensionContext): string {
