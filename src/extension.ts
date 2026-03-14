@@ -4,6 +4,7 @@ import { registerCommands, setWfctlPath } from './commands.js';
 import { checkAndRegisterMcpServer } from './mcp-config.js';
 import { resolveWfctlPath } from './wfctl.js';
 import { WorkflowVisualEditorProvider, isWorkflowFile, promptWorkflowDetection } from './visual-editor.js';
+import { MarketplaceProvider, MarketplaceItem } from './marketplace/MarketplaceProvider.js';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel('Workflow');
@@ -56,6 +57,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   if (config.get<boolean>('mcpServer.autoRegister', true)) {
     await checkAndRegisterMcpServer(wfctlPath, outputChannel);
   }
+
+  // Register plugin marketplace panel
+  const marketplaceProvider = new MarketplaceProvider();
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('workflowPluginMarketplace', marketplaceProvider),
+    vscode.commands.registerCommand('workflow.refreshMarketplace', () => marketplaceProvider.refresh()),
+    vscode.commands.registerCommand('workflow.installPlugin', async (item: MarketplaceItem) => {
+      const terminal = vscode.window.createTerminal('wfctl');
+      terminal.sendText(`wfctl plugin install ${item.plugin.name}`);
+      terminal.show();
+    })
+  );
 
   outputChannel.appendLine('Workflow Engine extension activated.');
 }

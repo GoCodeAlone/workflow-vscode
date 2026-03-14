@@ -36,6 +36,23 @@
     "redhat.vscode-yaml"
   ],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "workflow-explorer",
+          "title": "Workflow Engine",
+          "icon": "$(workflow)"
+        }
+      ]
+    },
+    "views": {
+      "workflow-explorer": [
+        {
+          "id": "workflowPluginMarketplace",
+          "name": "Plugin Marketplace"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "workflow.validate",
@@ -65,6 +82,16 @@
         "command": "workflow.openVisualEditor",
         "title": "Workflow: Open Visual Editor",
         "icon": "$(graph)"
+      },
+      {
+        "command": "workflow.installPlugin",
+        "title": "Install Plugin",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "workflow.refreshMarketplace",
+        "title": "Refresh Marketplace",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -73,6 +100,20 @@
           "command": "workflow.openVisualEditor",
           "when": "resourceExtname == .yaml || resourceExtname == .yml",
           "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "workflow.refreshMarketplace",
+          "when": "view == workflowPluginMarketplace",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "workflow.installPlugin",
+          "when": "viewItem == pluginMarketplaceItem",
+          "group": "inline"
         }
       ]
     },
