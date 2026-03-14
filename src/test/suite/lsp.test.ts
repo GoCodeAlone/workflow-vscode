@@ -334,8 +334,8 @@ suite('LSP Server', () => {
 
     assert.strictEqual(
       expectedFunctions.length,
-      38,
-      `Expected 38 template functions, got ${expectedFunctions.length}`,
+      40,
+      `Expected 40 template functions, got ${expectedFunctions.length}`,
     );
 
     // Validate that core pipeline functions are present
