@@ -41,7 +41,7 @@
         {
           "id": "workflow-explorer",
           "title": "Workflow Engine",
-          "icon": "$(workflow)"
+          "icon": "$(plug)"
         }
       ]
     },

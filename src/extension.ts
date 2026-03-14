@@ -61,6 +61,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Register plugin marketplace panel
   const marketplaceProvider = new MarketplaceProvider();
   context.subscriptions.push(
+    marketplaceProvider,
     vscode.window.registerTreeDataProvider('workflowPluginMarketplace', marketplaceProvider),
     vscode.commands.registerCommand('workflow.refreshMarketplace', () => marketplaceProvider.refresh()),
     vscode.commands.registerCommand('workflow.installPlugin', async (item: MarketplaceItem) => {

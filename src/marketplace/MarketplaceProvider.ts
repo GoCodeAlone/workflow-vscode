@@ -10,28 +10,32 @@ interface RegistryPlugin {
   tier: string;
   type: string;
   keywords: string[];
-  private: boolean;
+  private?: boolean;
   repository: string;
-  capabilities: {
+  capabilities?: {
     stepTypes: string[];
     moduleTypes: string[];
     triggerTypes: string[];
   };
 }
 
-export class MarketplaceProvider implements vscode.TreeDataProvider<MarketplaceItem> {
-  private _onDidChangeTreeData = new vscode.EventEmitter<MarketplaceItem | undefined>();
+export class MarketplaceProvider implements vscode.TreeDataProvider<MarketplaceItem>, vscode.Disposable {
+  private readonly _onDidChangeTreeData = new vscode.EventEmitter<MarketplaceItem | undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private cache: RegistryPlugin[] | null = null;
   private cacheTime = 0;
+
+  dispose(): void {
+    this._onDidChangeTreeData.dispose();
+  }
 
   refresh(): void {
     this.cache = null;
     this._onDidChangeTreeData.fire(undefined);
   }
 
-  async getChildren(): Promise<MarketplaceItem[]> {
+  async getChildren(_element?: MarketplaceItem): Promise<MarketplaceItem[]> {
     const plugins = await this.fetchIndex();
     return plugins
       .filter(p => !p.private)
@@ -49,7 +53,11 @@ export class MarketplaceProvider implements vscode.TreeDataProvider<MarketplaceI
     try {
       const resp = await fetch(`${REGISTRY_URL}/index.json`);
       if (!resp.ok) { throw new Error(`HTTP ${resp.status}`); }
-      this.cache = (await resp.json()) as RegistryPlugin[];
+      const data: unknown = await resp.json();
+      if (!Array.isArray(data)) {
+        throw new Error('Registry index is not an array');
+      }
+      this.cache = data as RegistryPlugin[];
       this.cacheTime = Date.now();
       return this.cache;
     } catch (e) {
@@ -65,8 +73,8 @@ export class MarketplaceItem extends vscode.TreeItem {
     this.description = `v${plugin.version} · ${plugin.tier}`;
     this.tooltip = new vscode.MarkdownString(
       `**${plugin.name}** v${plugin.version}\n\n${plugin.description}\n\n` +
-      `Steps: ${plugin.capabilities?.stepTypes?.length || 0} · ` +
-      `Modules: ${plugin.capabilities?.moduleTypes?.length || 0}`
+      `Steps: ${plugin.capabilities?.stepTypes?.length ?? 0} · ` +
+      `Modules: ${plugin.capabilities?.moduleTypes?.length ?? 0}`
     );
     this.contextValue = 'pluginMarketplaceItem';
     this.iconPath = new vscode.ThemeIcon(
