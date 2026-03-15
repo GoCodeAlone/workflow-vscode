@@ -31,6 +31,10 @@ export function setWfctlPath(p: string): void {
   wfctlBinaryPath = p;
 }
 
+export function getWfctlPath(): string {
+  return wfctlBinaryPath;
+}
+
 function getActiveFilePath(): string | undefined {
   const editor = vscode.window.activeTextEditor;
   return editor?.document.uri.fsPath;

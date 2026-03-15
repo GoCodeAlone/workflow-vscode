@@ -29,7 +29,8 @@
     "workspaceContains:**/workflow.yaml",
     "workspaceContains:**/workflow.yml",
     "workspaceContains:**/app.yaml",
-    "workspaceContains:**/app.yml"
+    "workspaceContains:**/app.yml",
+    "onView:workflowPluginMarketplace"
   ],
   "main": "./out/extension.js",
   "extensionDependencies": [
@@ -41,7 +42,7 @@
         {
           "id": "workflow-explorer",
           "title": "Workflow Engine",
-          "icon": "$(plug)"
+          "icon": "media/workflow-icon.svg"
         }
       ]
     },
@@ -85,12 +86,12 @@
       },
       {
         "command": "workflow.installPlugin",
-        "title": "Install Plugin",
+        "title": "Workflow: Install Plugin",
         "icon": "$(cloud-download)"
       },
       {
         "command": "workflow.refreshMarketplace",
-        "title": "Refresh Marketplace",
+        "title": "Workflow: Refresh Marketplace",
         "icon": "$(refresh)"
       }
     ],

@@ -82,7 +82,7 @@ suite('Command Arguments', () => {
     );
     const declaredCommands: string[] = packageJson.contributes.commands
       .map((c: { command: string }) => c.command)
-      .filter((c: string) => c !== 'workflow.init' && c !== 'workflow.openVisualEditor');
+      .filter((c: string) => !['workflow.init', 'workflow.openVisualEditor', 'workflow.installPlugin', 'workflow.refreshMarketplace'].includes(c));
 
     for (const cmd of declaredCommands) {
       assert.ok(

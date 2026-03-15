@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
+import * as child_process from 'child_process';
 import { startLspClient, stopLspClient } from './lsp-client.js';
-import { registerCommands, setWfctlPath } from './commands.js';
+import { registerCommands, setWfctlPath, getWfctlPath } from './commands.js';
 import { checkAndRegisterMcpServer } from './mcp-config.js';
 import { resolveWfctlPath } from './wfctl.js';
 import { WorkflowVisualEditorProvider, isWorkflowFile, promptWorkflowDetection } from './visual-editor.js';
@@ -64,10 +65,36 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     marketplaceProvider,
     vscode.window.registerTreeDataProvider('workflowPluginMarketplace', marketplaceProvider),
     vscode.commands.registerCommand('workflow.refreshMarketplace', () => marketplaceProvider.refresh()),
-    vscode.commands.registerCommand('workflow.installPlugin', async (item: MarketplaceItem) => {
-      const terminal = vscode.window.createTerminal('wfctl');
-      terminal.sendText(`wfctl plugin install ${item.plugin.name}`);
-      terminal.show();
+    vscode.commands.registerCommand('workflow.installPlugin', async (item?: MarketplaceItem) => {
+      if (!item?.plugin?.name) {
+        vscode.window.showWarningMessage('Select a plugin from the Marketplace panel to install.');
+        return;
+      }
+      const name = item.plugin.name;
+      if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
+        vscode.window.showErrorMessage(`Invalid plugin name: ${name}`);
+        return;
+      }
+      const wfctl = getWfctlPath();
+      outputChannel.show(true);
+      outputChannel.appendLine(`> ${wfctl} plugin install ${name}`);
+      const proc = child_process.spawn(wfctl, ['plugin', 'install', name], {
+        cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+        shell: false,
+      });
+      proc.stdout.on('data', (data: Buffer) => outputChannel.append(data.toString()));
+      proc.stderr.on('data', (data: Buffer) => outputChannel.append(data.toString()));
+      proc.on('close', (code) => {
+        outputChannel.appendLine(`\n[wfctl exited with code ${code}]`);
+        if (code === 0) {
+          vscode.window.showInformationMessage(`Plugin ${name} installed successfully.`);
+        } else {
+          vscode.window.showErrorMessage(`Failed to install plugin ${name} (exit code ${code}).`);
+        }
+      });
+      proc.on('error', (err) => {
+        vscode.window.showErrorMessage(`wfctl error: ${err.message}`);
+      });
     })
   );
 
