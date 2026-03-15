@@ -29,13 +29,31 @@
     "workspaceContains:**/workflow.yaml",
     "workspaceContains:**/workflow.yml",
     "workspaceContains:**/app.yaml",
-    "workspaceContains:**/app.yml"
+    "workspaceContains:**/app.yml",
+    "onView:workflowPluginMarketplace"
   ],
   "main": "./out/extension.js",
   "extensionDependencies": [
     "redhat.vscode-yaml"
   ],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "workflow-explorer",
+          "title": "Workflow Engine",
+          "icon": "media/workflow-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "workflow-explorer": [
+        {
+          "id": "workflowPluginMarketplace",
+          "name": "Plugin Marketplace"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "workflow.validate",
@@ -65,6 +83,16 @@
         "command": "workflow.openVisualEditor",
         "title": "Workflow: Open Visual Editor",
         "icon": "$(graph)"
+      },
+      {
+        "command": "workflow.installPlugin",
+        "title": "Workflow: Install Plugin",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "workflow.refreshMarketplace",
+        "title": "Workflow: Refresh Marketplace",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -73,6 +101,20 @@
           "command": "workflow.openVisualEditor",
           "when": "resourceExtname == .yaml || resourceExtname == .yml",
           "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "workflow.refreshMarketplace",
+          "when": "view == workflowPluginMarketplace",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "workflow.installPlugin",
+          "when": "viewItem == pluginMarketplaceItem",
+          "group": "inline"
         }
       ]
     },
