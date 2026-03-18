@@ -72,7 +72,7 @@ export class WorkflowVisualEditorProvider {
           const yamlUri = this.document!.uri;
           const sidecarUri = vscode.Uri.file(yamlUri.fsPath.replace(/\.ya?ml$/, '.workflow-editor.json'));
           const content = new TextEncoder().encode(JSON.stringify(msg.layout, null, 2));
-          await vscode.workspace.fs.writeFile(sidecarUri, content);
+          vscode.workspace.fs.writeFile(sidecarUri, content);
           break;
         }
       }
