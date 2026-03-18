@@ -68,6 +68,13 @@ export class WorkflowVisualEditorProvider {
           this.sendYamlToEditor(this.document!.getText());
           this.sendSchemas();
           break;
+        case 'layoutChanged': {
+          const yamlUri = this.document!.uri;
+          const sidecarUri = vscode.Uri.file(yamlUri.fsPath.replace(/\.ya?ml$/, '.workflow-editor.json'));
+          const content = new TextEncoder().encode(JSON.stringify(msg.layout, null, 2));
+          await vscode.workspace.fs.writeFile(sidecarUri, content);
+          break;
+        }
       }
     });
   }
@@ -101,8 +108,18 @@ export class WorkflowVisualEditorProvider {
     });
   }
 
-  private sendYamlToEditor(content: string) {
+  private async sendYamlToEditor(content: string) {
     this.panel?.webview.postMessage({ type: 'yamlChanged', content });
+    if (this.document) {
+      const uri = this.document.uri;
+      const sidecarUri = vscode.Uri.file(uri.fsPath.replace(/\.ya?ml$/, '.workflow-editor.json'));
+      try {
+        const sidecarContent = await vscode.workspace.fs.readFile(sidecarUri);
+        this.panel?.webview.postMessage({ type: 'layoutLoaded', layout: JSON.parse(new TextDecoder().decode(sidecarContent)) });
+      } catch {
+        // No sidecar file — editor will use auto-layout
+      }
+    }
   }
 
   private async handleYamlFromWebview(content: string) {
