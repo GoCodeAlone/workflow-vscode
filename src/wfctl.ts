@@ -62,24 +62,34 @@ async function downloadBinary(destPath: string, outputChannel: vscode.OutputChan
   const destDir = path.dirname(destPath);
   fs.mkdirSync(destDir, { recursive: true });
 
+  // Follow redirects properly (GitHub uses multi-hop redirects)
   await new Promise<void>((resolve, reject) => {
     const file = fs.createWriteStream(destPath);
-    https.get(downloadUrl, (res) => {
-      if (res.statusCode === 302 || res.statusCode === 301) {
-        const location = res.headers.location;
-        if (!location) {
-          reject(new Error('Redirect with no location'));
-          return;
-        }
-        https.get(location, (res2) => {
-          res2.pipe(file);
-          file.on('finish', () => { file.close(); resolve(); });
-        }).on('error', reject);
-      } else {
-        res.pipe(file);
-        file.on('finish', () => { file.close(); resolve(); });
+
+    function followRedirects(url: string, maxRedirects: number) {
+      if (maxRedirects <= 0) {
+        reject(new Error('Too many redirects'));
+        return;
       }
-    }).on('error', reject);
+      https.get(url, { headers: { 'User-Agent': 'workflow-vscode' } }, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          const location = res.headers.location;
+          if (!location) {
+            reject(new Error('Redirect with no location'));
+            return;
+          }
+          res.resume(); // consume response to free up memory
+          followRedirects(location, maxRedirects - 1);
+        } else if (res.statusCode === 200) {
+          res.pipe(file);
+          file.on('finish', () => { file.close(); resolve(); });
+        } else {
+          reject(new Error(`Download failed with status ${res.statusCode}`));
+        }
+      }).on('error', reject);
+    }
+
+    followRedirects(downloadUrl, 5);
   });
 
   fs.chmodSync(destPath, 0o755);
