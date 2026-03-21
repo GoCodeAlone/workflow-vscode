@@ -3,9 +3,11 @@ import * as child_process from 'child_process';
 import { startLspClient, stopLspClient } from './lsp-client.js';
 import { registerCommands, setWfctlPath, getWfctlPath } from './commands.js';
 import { checkAndRegisterMcpServer } from './mcp-config.js';
-import { resolveWfctlPath } from './wfctl.js';
+import { resolveWfctlPath, downloadWfctl } from './wfctl.js';
+import { downloadLspBinary } from './lsp-client.js';
 import { WorkflowVisualEditorProvider, isWorkflowFile, promptWorkflowDetection } from './visual-editor.js';
 import { MarketplaceProvider, MarketplaceItem } from './marketplace/MarketplaceProvider.js';
+import { checkBinaryVersion } from './version-check.js';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel('Workflow');
@@ -51,6 +53,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   if (config.get<boolean>('lspServer.enabled', true)) {
     startLspClient(context, outputChannel).catch((err) => {
       outputChannel.appendLine(`LSP client not started: ${err}`);
+      vscode.window.showWarningMessage(
+        `Workflow LSP failed to start: ${err}. Validation and completions may be unavailable.`,
+        'Show Output'
+      ).then((choice) => {
+        if (choice === 'Show Output') outputChannel.show(true);
+      });
     });
   }
 
