@@ -3,8 +3,8 @@ import * as child_process from 'child_process';
 import { startLspClient, stopLspClient } from './lsp-client.js';
 import { registerCommands, setWfctlPath, getWfctlPath } from './commands.js';
 import { checkAndRegisterMcpServer } from './mcp-config.js';
-import { resolveWfctlPath, downloadWfctl } from './wfctl.js';
-import { downloadLspBinary } from './lsp-client.js';
+import { resolveWfctlPath, downloadWfctl, getDefaultWfctlPath } from './wfctl.js';
+import { downloadLspBinary, getDefaultLspBinaryPath } from './lsp-client.js';
 import { WorkflowVisualEditorProvider, isWorkflowFile, promptWorkflowDetection } from './visual-editor.js';
 import { MarketplaceProvider, MarketplaceItem } from './marketplace/MarketplaceProvider.js';
 import { checkBinaryVersion } from './version-check.js';
@@ -105,6 +105,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       });
     })
   );
+
+  // Check for binary updates (non-blocking, once per 24h)
+  checkBinaryVersion(
+    context,
+    'wfctl',
+    wfctlPath !== 'wfctl' ? wfctlPath : getDefaultWfctlPath(context),
+    outputChannel,
+    () => downloadWfctl(context, outputChannel),
+  ).catch(() => { /* silently ignore */ });
+
+  checkBinaryVersion(
+    context,
+    'workflow-lsp-server',
+    getDefaultLspBinaryPath(context),
+    outputChannel,
+    () => downloadLspBinary(context, outputChannel),
+  ).catch(() => { /* silently ignore */ });
 
   outputChannel.appendLine('Workflow Engine extension activated.');
 }

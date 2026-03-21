@@ -28,10 +28,19 @@ export function buildDownloadUrl(binaryName: string, tag: string): string {
   return `https://github.com/${GITHUB_REPO}/releases/download/${tag}/${assetName}`;
 }
 
+export function getDefaultWfctlPath(context: vscode.ExtensionContext): string {
+  return getDefaultBinaryPath(context);
+}
+
 function getDefaultBinaryPath(context: vscode.ExtensionContext): string {
   const suffix = getPlatformSuffix();
   const binaryFileName = os.platform() === 'win32' ? `${BINARY_NAME}.exe` : BINARY_NAME;
   return path.join(context.globalStorageUri.fsPath, 'bin', suffix, binaryFileName);
+}
+
+export async function downloadWfctl(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel): Promise<void> {
+  const destPath = getDefaultBinaryPath(context);
+  await downloadBinary(destPath, outputChannel);
 }
 
 async function downloadBinary(destPath: string, outputChannel: vscode.OutputChannel): Promise<void> {

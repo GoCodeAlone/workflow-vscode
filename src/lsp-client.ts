@@ -39,10 +39,19 @@ export function buildLspDownloadUrl(tag: string): string {
 
 export { getPlatformSuffix as getLspPlatformSuffix };
 
+export function getDefaultLspBinaryPath(context: vscode.ExtensionContext): string {
+  return getDefaultBinaryPath(context);
+}
+
 function getDefaultBinaryPath(context: vscode.ExtensionContext): string {
   const suffix = getPlatformSuffix();
   const binaryFileName = os.platform() === 'win32' ? `${BINARY_NAME}.exe` : BINARY_NAME;
   return path.join(context.globalStorageUri.fsPath, 'bin', suffix, binaryFileName);
+}
+
+export async function downloadLspBinary(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel): Promise<void> {
+  const destPath = getDefaultBinaryPath(context);
+  await downloadBinary(destPath, outputChannel);
 }
 
 async function downloadBinary(destPath: string, outputChannel: vscode.OutputChannel): Promise<void> {
