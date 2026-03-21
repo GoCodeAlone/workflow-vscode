@@ -116,8 +116,9 @@ export class WorkflowVisualEditorProvider {
       try {
         const sidecarContent = await vscode.workspace.fs.readFile(sidecarUri);
         this.panel?.webview.postMessage({ type: 'layoutLoaded', layout: JSON.parse(new TextDecoder().decode(sidecarContent)) });
-      } catch {
+      } catch (err) {
         // No sidecar file — editor will use auto-layout
+        console.warn('No sidecar file found, using auto-layout:', sidecarUri.fsPath, err);
       }
     }
   }
@@ -155,8 +156,9 @@ export class WorkflowVisualEditorProvider {
       const content = fs.readFileSync(schemaPath, 'utf-8');
       const schema = JSON.parse(content);
       this.panel?.webview.postMessage({ type: 'schemasLoaded', schemas: schema });
-    } catch {
+    } catch (err) {
       // Schema file not available — editor degrades gracefully
+      console.warn('Schema file not available:', schemaPath, err);
     }
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -175,8 +177,9 @@ export class WorkflowVisualEditorProvider {
       await vscode.env.clipboard.writeText(context);
       try {
         await vscode.commands.executeCommand('workbench.action.chat.open');
-      } catch {
+      } catch (err) {
         // Chat panel may not be available
+        console.warn('Chat panel could not be opened:', err);
       }
       vscode.window.showInformationMessage(
         'Workflow context copied to clipboard. Paste into Copilot chat and describe what you\'d like to change.'
