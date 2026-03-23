@@ -1,140 +1,228 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "workflow-test.schema.json",
-  "title": "Workflow Test File",
-  "description": "Schema for workflow _test.yaml files",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Workflow Test",
+  "description": "Schema for GoCodeAlone/workflow engine _test.yaml files",
   "type": "object",
   "properties": {
     "config": {
       "type": "string",
-      "description": "Path to the workflow config file being tested (e.g. app.yaml)"
+      "description": "Path to the workflow config file under test (mutually exclusive with yaml)"
+    },
+    "yaml": {
+      "type": "string",
+      "description": "Inline workflow YAML config string (mutually exclusive with config)"
     },
     "mocks": {
       "type": "object",
-      "description": "Global mock overrides applied to all tests",
+      "description": "Global mock overrides applied to all tests (per-test mocks override these)",
       "properties": {
         "steps": {
           "type": "object",
-          "description": "Mock step responses by step name",
+          "description": "Map of step type (e.g. step.db_query) to mocked output fields",
           "additionalProperties": {
             "type": "object",
-            "properties": {
-              "output": { "type": "object", "description": "Mocked output value" },
-              "error": { "type": "string", "description": "Mocked error message" }
-            }
-          }
-        },
-        "modules": {
-          "type": "object",
-          "description": "Mock module responses by module name",
-          "additionalProperties": {
-            "type": "object"
+            "description": "Mocked output map for this step type"
           }
         }
       },
       "additionalProperties": false
     },
     "tests": {
-      "type": "array",
-      "description": "List of test cases",
-      "items": {
-        "$ref": "#/definitions/TestCase"
+      "type": "object",
+      "description": "Map of test name to test case definition",
+      "additionalProperties": {
+        "$ref": "#/$defs/testCase"
       }
     }
   },
-  "required": ["config", "tests"],
   "additionalProperties": false,
-  "definitions": {
-    "TestCase": {
+  "$defs": {
+    "testCase": {
       "type": "object",
       "description": "A single test case",
       "properties": {
-        "name": {
+        "description": {
           "type": "string",
-          "description": "Test case name"
+          "description": "Human-readable label shown in test output"
         },
         "trigger": {
-          "type": "object",
-          "description": "The trigger input for this test",
-          "properties": {
-            "pipeline": { "type": "string", "description": "Pipeline name to trigger" },
-            "method": { "type": "string", "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"], "description": "HTTP method" },
-            "path": { "type": "string", "description": "HTTP path" },
-            "body": { "type": "object", "description": "Request body" },
-            "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Request headers" },
-            "query": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Query parameters" }
-          }
+          "$ref": "#/$defs/triggerDef"
+        },
+        "stop_after": {
+          "type": "string",
+          "description": "Halt pipeline execution after this named step completes"
         },
         "mocks": {
           "type": "object",
-          "description": "Test-level mock overrides",
+          "description": "Per-test mock overrides (same structure as global mocks)",
           "properties": {
             "steps": {
               "type": "object",
               "additionalProperties": {
-                "type": "object",
-                "properties": {
-                  "output": { "type": "object" },
-                  "error": { "type": "string" }
-                }
+                "type": "object"
               }
-            },
-            "modules": {
-              "type": "object",
-              "additionalProperties": { "type": "object" }
             }
-          }
-        },
-        "stop_after": {
-          "type": "string",
-          "description": "Stop execution after this step name"
-        },
-        "sequence": {
-          "type": "array",
-          "description": "Expected execution sequence of step names",
-          "items": { "type": "string" }
-        },
-        "state": {
-          "type": "object",
-          "description": "Expected pipeline state after execution"
+          },
+          "additionalProperties": false
         },
         "assertions": {
           "type": "array",
-          "description": "Assertions to evaluate after execution",
+          "description": "Ordered list of checks applied to the result (used with trigger, ignored when sequence is set)",
           "items": {
-            "$ref": "#/definitions/Assertion"
+            "$ref": "#/$defs/assertion"
+          }
+        },
+        "state": {
+          "$ref": "#/$defs/stateConfig"
+        },
+        "sequence": {
+          "type": "array",
+          "description": "Multi-step stateful test sequence (replaces single trigger)",
+          "items": {
+            "$ref": "#/$defs/sequenceStep"
           }
         }
       },
-      "required": ["name", "trigger"],
       "additionalProperties": false
     },
-    "Assertion": {
+    "triggerDef": {
       "type": "object",
-      "description": "A single assertion",
+      "description": "How to invoke the system under test",
       "properties": {
+        "type": {
+          "type": "string",
+          "description": "Trigger kind",
+          "enum": ["pipeline", "http"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Pipeline name (used when type is pipeline)"
+        },
+        "data": {
+          "type": "object",
+          "description": "Trigger input data (pipeline trigger data or HTTP body)",
+          "additionalProperties": true
+        },
+        "method": {
+          "type": "string",
+          "description": "HTTP method (used when type is http)",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+        },
         "path": {
           "type": "string",
-          "description": "JSONPath expression to evaluate (e.g. $.response.status)"
+          "description": "HTTP path (used when type is http)"
         },
-        "equals": {
-          "description": "Expected value (equality check)"
-        },
-        "contains": {
-          "description": "Expected contained value"
-        },
-        "matches": {
-          "type": "string",
-          "description": "Regular expression to match against"
-        },
-        "exists": {
-          "type": "boolean",
-          "description": "Assert the path exists (true) or does not exist (false)"
-        },
-        "gt": { "type": "number", "description": "Assert value is greater than" },
-        "lt": { "type": "number", "description": "Assert value is less than" }
+        "headers": {
+          "type": "object",
+          "description": "HTTP request headers",
+          "additionalProperties": { "type": "string" }
+        }
       },
-      "required": ["path"],
+      "additionalProperties": false
+    },
+    "assertion": {
+      "type": "object",
+      "description": "One check applied to the test result",
+      "properties": {
+        "step": {
+          "type": "string",
+          "description": "Scope this assertion to a specific step's output (if empty, applies to overall pipeline output)"
+        },
+        "output": {
+          "type": "object",
+          "description": "Assert that all key/value pairs appear in the output",
+          "additionalProperties": true
+        },
+        "executed": {
+          "type": "boolean",
+          "description": "Assert whether the named step ran (true) or was skipped (false)"
+        },
+        "response": {
+          "$ref": "#/$defs/responseAssert"
+        },
+        "state": {
+          "type": "object",
+          "description": "Assert per-store key/value pairs in the StateStore (store_name -> key -> expected_value)",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "responseAssert": {
+      "type": "object",
+      "description": "Assert HTTP response fields",
+      "properties": {
+        "status": {
+          "type": "integer",
+          "description": "Expected HTTP status code (0 means do not check)"
+        },
+        "body": {
+          "type": "string",
+          "description": "Substring expected in the response body"
+        }
+      },
+      "additionalProperties": false
+    },
+    "stateConfig": {
+      "type": "object",
+      "description": "State to set up before a test case runs",
+      "properties": {
+        "fixtures": {
+          "type": "array",
+          "description": "Files to load into named stores",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string",
+                "description": "Path to the fixture file (JSON or YAML)"
+              },
+              "target": {
+                "type": "string",
+                "description": "Store name to seed"
+              }
+            },
+            "required": ["file", "target"],
+            "additionalProperties": false
+          }
+        },
+        "seed": {
+          "type": "object",
+          "description": "Inline initial state: store_name -> key -> value",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "sequenceStep": {
+      "type": "object",
+      "description": "One step in a multi-step stateful test",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Label shown in test output"
+        },
+        "pipeline": {
+          "type": "string",
+          "description": "Shorthand pipeline name (used if trigger.name is empty)"
+        },
+        "trigger": {
+          "$ref": "#/$defs/triggerDef"
+        },
+        "assertions": {
+          "type": "array",
+          "description": "Assertions checked after this step executes",
+          "items": {
+            "$ref": "#/$defs/assertion"
+          }
+        }
+      },
       "additionalProperties": false
     }
   }
