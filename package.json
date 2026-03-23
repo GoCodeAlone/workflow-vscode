@@ -93,6 +93,19 @@
         "command": "workflow.refreshMarketplace",
         "title": "Workflow: Refresh Marketplace",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "workflow.test",
+        "title": "Workflow: Run Tests"
+      },
+      {
+        "command": "workflow.testFile",
+        "title": "Workflow: Run Test File",
+        "icon": "$(play)"
+      },
+      {
+        "command": "workflow.testCoverage",
+        "title": "Workflow: Test Coverage"
       }
     ],
     "menus": {
@@ -100,6 +113,11 @@
         {
           "command": "workflow.openVisualEditor",
           "when": "resourceExtname == .yaml || resourceExtname == .yml",
+          "group": "navigation"
+        },
+        {
+          "command": "workflow.testFile",
+          "when": "resourceFilename =~ /_test\\.ya?ml$/",
           "group": "navigation"
         }
       ],
@@ -153,6 +171,11 @@
           "type": "boolean",
           "default": false,
           "description": "Don't show detection prompt for workflow YAML files"
+        },
+        "workflow.configRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the root workflow config file (e.g. config/app.yaml). Overrides auto-discovery."
         }
       }
     },
@@ -165,6 +188,13 @@
           "app.yml"
         ],
         "url": "./schemas/workflow-config.schema.json"
+      },
+      {
+        "fileMatch": [
+          "*_test.yaml",
+          "*_test.yml"
+        ],
+        "url": "./schemas/workflow-test.schema.json"
       }
     ],
     "snippets": [
