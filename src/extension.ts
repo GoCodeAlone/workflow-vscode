@@ -7,6 +7,8 @@ import { resolveWfctlPath, downloadWfctl, getDefaultWfctlPath } from './wfctl.js
 import { downloadLspBinary, getDefaultLspBinaryPath } from './lsp-client.js';
 import { WorkflowVisualEditorProvider, isWorkflowFile, promptWorkflowDetection } from './visual-editor.js';
 import { MarketplaceProvider, MarketplaceItem } from './marketplace/MarketplaceProvider.js';
+import { discoverConfigRoot } from './workspace-discovery.js';
+import { registerPipelineNavigation } from './pipeline-navigation.js';
 import { checkBinaryVersion } from './version-check.js';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -105,6 +107,41 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       });
     })
   );
+
+  // Register wfctl test commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('workflow.test', async () => {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '.';
+      const terminal = vscode.window.createTerminal('Workflow Tests');
+      terminal.sendText(`wfctl test "${workspaceRoot}"`);
+      terminal.show();
+    }),
+    vscode.commands.registerCommand('workflow.testFile', async () => {
+      const file = vscode.window.activeTextEditor?.document.fileName;
+      if (!file) {
+        vscode.window.showWarningMessage('Open a test file to run.');
+        return;
+      }
+      const terminal = vscode.window.createTerminal('Workflow Tests');
+      terminal.sendText(`wfctl test "${file}"`);
+      terminal.show();
+    }),
+    vscode.commands.registerCommand('workflow.testCoverage', async () => {
+      const activeFile = vscode.window.activeTextEditor?.document.fileName;
+      const startPath = activeFile ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '.';
+      const rootConfig = await discoverConfigRoot(startPath);
+      const terminal = vscode.window.createTerminal('Workflow Tests');
+      if (rootConfig) {
+        terminal.sendText(`wfctl test --coverage "${rootConfig}"`);
+      } else {
+        terminal.sendText('wfctl test --coverage .');
+      }
+      terminal.show();
+    })
+  );
+
+  // Register .feature pipeline navigation (CodeLens + goToPipeline command)
+  registerPipelineNavigation(context);
 
   // Check for binary updates (non-blocking, once per 24h)
   checkBinaryVersion(
