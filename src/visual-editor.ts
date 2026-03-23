@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { discoverPluginSchemas } from './plugin-discovery';
+import { detectWorkflowFileType } from './file-detection';
 
 export class WorkflowVisualEditorProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -315,14 +316,11 @@ function isExplicitMatch(document: vscode.TextDocument, configPaths: string[]): 
   return false;
 }
 
-function isContentMatch(document: vscode.TextDocument): boolean {
-  const text = document.getText();
-  return text.includes('modules:') && text.includes('workflows:');
-}
-
 export function isWorkflowFile(document: vscode.TextDocument): boolean {
   const configPaths: string[] = vscode.workspace.getConfiguration('workflow').get('configPaths', []);
-  return isExplicitMatch(document, configPaths) || isContentMatch(document);
+  if (isExplicitMatch(document, configPaths)) return true;
+  const type = detectWorkflowFileType(document);
+  return type === 'config' || type === 'partial';
 }
 
 export function promptWorkflowDetection(document: vscode.TextDocument) {
@@ -330,7 +328,7 @@ export function promptWorkflowDetection(document: vscode.TextDocument) {
   const configPaths: string[] = vscode.workspace.getConfiguration('workflow').get('configPaths', []);
   if (isExplicitMatch(document, configPaths)) return;
   if (vscode.workspace.getConfiguration('workflow').get('suppressDetectionPrompt', false)) return;
-  if (!isContentMatch(document)) return;
+  if (detectWorkflowFileType(document) !== 'config') return;
 
   vscode.window.showInformationMessage(
     'This looks like a Workflow config. Open the visual editor?',
