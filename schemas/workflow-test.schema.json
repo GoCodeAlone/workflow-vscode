@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "workflow-test.schema.json",
+  "title": "Workflow Test File",
+  "description": "Schema for workflow _test.yaml files",
+  "type": "object",
+  "properties": {
+    "config": {
+      "type": "string",
+      "description": "Path to the workflow config file being tested (e.g. app.yaml)"
+    },
+    "mocks": {
+      "type": "object",
+      "description": "Global mock overrides applied to all tests",
+      "properties": {
+        "steps": {
+          "type": "object",
+          "description": "Mock step responses by step name",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "output": { "type": "object", "description": "Mocked output value" },
+              "error": { "type": "string", "description": "Mocked error message" }
+            }
+          }
+        },
+        "modules": {
+          "type": "object",
+          "description": "Mock module responses by module name",
+          "additionalProperties": {
+            "type": "object"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tests": {
+      "type": "array",
+      "description": "List of test cases",
+      "items": {
+        "$ref": "#/definitions/TestCase"
+      }
+    }
+  },
+  "required": ["config", "tests"],
+  "additionalProperties": false,
+  "definitions": {
+    "TestCase": {
+      "type": "object",
+      "description": "A single test case",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Test case name"
+        },
+        "trigger": {
+          "type": "object",
+          "description": "The trigger input for this test",
+          "properties": {
+            "pipeline": { "type": "string", "description": "Pipeline name to trigger" },
+            "method": { "type": "string", "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"], "description": "HTTP method" },
+            "path": { "type": "string", "description": "HTTP path" },
+            "body": { "type": "object", "description": "Request body" },
+            "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Request headers" },
+            "query": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Query parameters" }
+          }
+        },
+        "mocks": {
+          "type": "object",
+          "description": "Test-level mock overrides",
+          "properties": {
+            "steps": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "output": { "type": "object" },
+                  "error": { "type": "string" }
+                }
+              }
+            },
+            "modules": {
+              "type": "object",
+              "additionalProperties": { "type": "object" }
+            }
+          }
+        },
+        "stop_after": {
+          "type": "string",
+          "description": "Stop execution after this step name"
+        },
+        "sequence": {
+          "type": "array",
+          "description": "Expected execution sequence of step names",
+          "items": { "type": "string" }
+        },
+        "state": {
+          "type": "object",
+          "description": "Expected pipeline state after execution"
+        },
+        "assertions": {
+          "type": "array",
+          "description": "Assertions to evaluate after execution",
+          "items": {
+            "$ref": "#/definitions/Assertion"
+          }
+        }
+      },
+      "required": ["name", "trigger"],
+      "additionalProperties": false
+    },
+    "Assertion": {
+      "type": "object",
+      "description": "A single assertion",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "JSONPath expression to evaluate (e.g. $.response.status)"
+        },
+        "equals": {
+          "description": "Expected value (equality check)"
+        },
+        "contains": {
+          "description": "Expected contained value"
+        },
+        "matches": {
+          "type": "string",
+          "description": "Regular expression to match against"
+        },
+        "exists": {
+          "type": "boolean",
+          "description": "Assert the path exists (true) or does not exist (false)"
+        },
+        "gt": { "type": "number", "description": "Assert value is greater than" },
+        "lt": { "type": "number", "description": "Assert value is less than" }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    }
+  }
+}
