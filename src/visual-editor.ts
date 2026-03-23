@@ -151,6 +151,10 @@ export class WorkflowVisualEditorProvider {
     }
   }
 
+  public sendTestResults(results: Record<string, { status: 'pass' | 'fail' | 'skip'; error?: string }>) {
+    this.panel?.webview.postMessage({ type: 'testResults', results });
+  }
+
   private async sendSchemas() {
     const schemaPath = path.join(this.context.extensionPath, 'schemas', 'workflow-config.schema.json');
     try {

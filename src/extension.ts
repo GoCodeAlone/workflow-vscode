@@ -10,6 +10,7 @@ import { MarketplaceProvider, MarketplaceItem } from './marketplace/MarketplaceP
 import { discoverConfigRoot } from './workspace-discovery.js';
 import { registerPipelineNavigation } from './pipeline-navigation.js';
 import { checkBinaryVersion } from './version-check.js';
+import { parseTestOutput, applyTestDecorations } from './test-results.js';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel('Workflow');
@@ -109,34 +110,59 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   // Register wfctl test commands
-  context.subscriptions.push(
-    vscode.commands.registerCommand('workflow.test', async () => {
-      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '.';
-      const terminal = vscode.window.createTerminal('Workflow Tests');
-      terminal.sendText(`wfctl test "${workspaceRoot}"`);
-      terminal.show();
-    }),
-    vscode.commands.registerCommand('workflow.testFile', async () => {
-      const file = vscode.window.activeTextEditor?.document.fileName;
-      if (!file) {
-        vscode.window.showWarningMessage('Open a test file to run.');
-        return;
+  const runTests = (args: string[], targetFile?: string) => {
+    outputChannel.show(true);
+    outputChannel.appendLine(`> ${wfctlPath} ${args.join(' ')}`);
+    let stdout = '';
+    const proc = child_process.spawn(wfctlPath, args, {
+      cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+      shell: false,
+    });
+    proc.stdout.on('data', (d: Buffer) => { const s = d.toString(); stdout += s; outputChannel.append(s); });
+    proc.stderr.on('data', (d: Buffer) => outputChannel.append(d.toString()));
+    proc.on('close', (code) => {
+      outputChannel.appendLine(`\n[wfctl test exited with code ${code}]`);
+      const results = parseTestOutput(stdout);
+      if (results.length === 0) return;
+
+      // Apply decorations to all visible _test.yaml editors
+      for (const editor of vscode.window.visibleTextEditors) {
+        const name = editor.document.fileName;
+        if (name.endsWith('_test.yaml') || name.endsWith('_test.yml')) {
+          applyTestDecorations(editor, results, context);
+        }
       }
-      const terminal = vscode.window.createTerminal('Workflow Tests');
-      terminal.sendText(`wfctl test "${file}"`);
-      terminal.show();
+      // Also target the specific file that was tested
+      if (targetFile) {
+        const targetEditor = vscode.window.visibleTextEditors.find(
+          (e) => e.document.fileName === targetFile
+        );
+        if (targetEditor) applyTestDecorations(targetEditor, results, context);
+      }
+
+      // Send to visual editor webview if open
+      const resultMap: Record<string, { status: 'pass' | 'fail' | 'skip'; error?: string }> = {};
+      for (const r of results) resultMap[r.name] = { status: r.status, error: r.error };
+      editorProvider.sendTestResults(resultMap);
+    });
+    proc.on('error', (err) => outputChannel.appendLine(`wfctl error: ${err.message}`));
+  };
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('workflow.test', () => {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '.';
+      runTests(['test', workspaceRoot]);
+    }),
+    vscode.commands.registerCommand('workflow.testFile', () => {
+      const file = vscode.window.activeTextEditor?.document.fileName;
+      if (!file) { vscode.window.showWarningMessage('Open a test file to run.'); return; }
+      runTests(['test', file], file);
     }),
     vscode.commands.registerCommand('workflow.testCoverage', async () => {
       const activeFile = vscode.window.activeTextEditor?.document.fileName;
       const startPath = activeFile ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '.';
       const rootConfig = await discoverConfigRoot(startPath);
-      const terminal = vscode.window.createTerminal('Workflow Tests');
-      if (rootConfig) {
-        terminal.sendText(`wfctl test --coverage "${rootConfig}"`);
-      } else {
-        terminal.sendText('wfctl test --coverage .');
-      }
-      terminal.show();
+      runTests(['test', '--coverage', rootConfig ?? '.']);
     })
   );
 
