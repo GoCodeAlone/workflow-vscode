@@ -3,7 +3,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as vscode from 'vscode';
-import { isWorkflowFile } from '../../visual-editor.js';
+import { isWorkflowFile, extractYamlPreamble, mergeYamlPreamble } from '../../visual-editor.js';
+import { detectWorkflowFileType } from '../../file-detection.js';
 
 suite('Visual Editor', () => {
   let tmpDir: string;
@@ -78,6 +79,45 @@ database:
       /registerCommand\s*\(\s*['"]workflow\.openVisualEditor['"]/
     );
     assert.ok(cmdRegistration, 'openVisualEditor command must be registered');
+  });
+
+  test('partial files show info message path — detectWorkflowFileType returns partial', async () => {
+    // A file with only pipelines: should be detected as partial
+    const content = `
+pipelines:
+  my-pipeline:
+    steps:
+      - step.transform
+`;
+    const filePath = path.join(tmpDir, 'partial.yaml');
+    fs.writeFileSync(filePath, content);
+    const doc = await vscode.workspace.openTextDocument(filePath);
+    assert.strictEqual(detectWorkflowFileType(doc), 'partial', 'Expected partial file type');
+    assert.ok(isWorkflowFile(doc), 'Expected isWorkflowFile to return true for partial');
+  });
+
+  test('name and version preserved through webview round-trip', () => {
+    const original = `name: my-workflow\nversion: "1.0"\nmodules:\n  - name: web\n    type: http.server\n`;
+    const preamble = extractYamlPreamble(original);
+    assert.ok(preamble.includes('name: my-workflow'), 'Preamble should contain name');
+    assert.ok(preamble.includes('version:'), 'Preamble should contain version');
+
+    // Simulate webview stripping name/version
+    const stripped = `modules:\n  - name: web\n    type: http.server\n`;
+    const merged = mergeYamlPreamble(preamble, stripped);
+    assert.ok(merged.includes('name: my-workflow'), 'Merged YAML should contain name');
+    assert.ok(merged.includes('version:'), 'Merged YAML should contain version');
+    assert.ok(merged.includes('modules:'), 'Merged YAML should still contain modules');
+  });
+
+  test('mergeYamlPreamble does not duplicate existing keys', () => {
+    const preamble = 'name: my-workflow\nversion: "1.0"';
+    const yaml = 'name: my-workflow\nversion: "1.0"\nmodules:\n  - name: web\n';
+    const merged = mergeYamlPreamble(preamble, yaml);
+    const nameCount = (merged.match(/^name:/gm) || []).length;
+    const versionCount = (merged.match(/^version:/gm) || []).length;
+    assert.strictEqual(nameCount, 1, 'name should not be duplicated');
+    assert.strictEqual(versionCount, 1, 'version should not be duplicated');
   });
 
   test('isWorkflowFile detects both modules and workflows keys', async () => {

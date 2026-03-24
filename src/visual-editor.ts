@@ -9,6 +9,7 @@ export class WorkflowVisualEditorProvider {
   private document: vscode.TextDocument | undefined;
   private updatingFromEditor = false;
   private updatingFromWebview = false;
+  private yamlPreamble: string = '';
 
   constructor(private context: vscode.ExtensionContext) {}
 
@@ -110,6 +111,10 @@ export class WorkflowVisualEditorProvider {
   }
 
   private async sendYamlToEditor(content: string) {
+    // Extract and store top-level name/version preamble before sending to webview
+    if (!this.updatingFromWebview) {
+      this.yamlPreamble = extractYamlPreamble(content);
+    }
     this.panel?.webview.postMessage({ type: 'yamlChanged', content });
     if (this.document) {
       const uri = this.document.uri;
@@ -128,11 +133,14 @@ export class WorkflowVisualEditorProvider {
     if (!this.document || this.updatingFromEditor) return;
     this.updatingFromWebview = true;
 
+    // Re-inject preamble (name/version) if the webview stripped it
+    const merged = mergeYamlPreamble(this.yamlPreamble, content);
+
     const edit = new vscode.WorkspaceEdit();
     edit.replace(
       this.document.uri,
       new vscode.Range(0, 0, this.document.lineCount, 0),
-      content
+      merged
     );
     await vscode.workspace.applyEdit(edit);
 
@@ -261,13 +269,14 @@ Rules:
 
     for (const entry of entries) {
       if (entry.path === null) {
-        // Main file — update the open document
+        // Main file — update the open document, restoring preamble
         this.updatingFromWebview = true;
+        const merged = mergeYamlPreamble(this.yamlPreamble, entry.content);
         const edit = new vscode.WorkspaceEdit();
         edit.replace(
           this.document.uri,
           new vscode.Range(0, 0, this.document.lineCount, 0),
-          entry.content
+          merged
         );
         await vscode.workspace.applyEdit(edit);
         this.updatingFromWebview = false;
@@ -332,7 +341,17 @@ export function promptWorkflowDetection(document: vscode.TextDocument) {
   const configPaths: string[] = vscode.workspace.getConfiguration('workflow').get('configPaths', []);
   if (isExplicitMatch(document, configPaths)) return;
   if (vscode.workspace.getConfiguration('workflow').get('suppressDetectionPrompt', false)) return;
-  if (detectWorkflowFileType(document) !== 'config') return;
+
+  const fileType = detectWorkflowFileType(document);
+
+  if (fileType === 'partial') {
+    vscode.window.showInformationMessage(
+      'This file appears to be a partial workflow config (pipelines only). Open the root config file to use the visual editor.'
+    );
+    return;
+  }
+
+  if (fileType !== 'config') return;
 
   vscode.window.showInformationMessage(
     'This looks like a Workflow config. Open the visual editor?',
@@ -350,6 +369,42 @@ export function promptWorkflowDetection(document: vscode.TextDocument) {
       vscode.workspace.getConfiguration('workflow').update('suppressDetectionPrompt', true, vscode.ConfigurationTarget.Global);
     }
   });
+}
+
+// Preamble keys that live at the top level of a workflow config and may be
+// stripped by the visual editor's serialiser.
+const PREAMBLE_KEYS = ['name', 'version'];
+
+/**
+ * Extract top-level name/version lines from YAML content so they can be
+ * re-injected after the webview round-trip.
+ */
+export function extractYamlPreamble(yaml: string): string {
+  const lines: string[] = [];
+  for (const line of yaml.split('\n')) {
+    const m = line.match(/^(\w+):\s*(.+)/);
+    if (m && PREAMBLE_KEYS.includes(m[1])) {
+      lines.push(line);
+    }
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Merge preamble lines back into YAML that may have lost them.
+ * If the YAML already contains a preamble key, it is left unchanged.
+ */
+export function mergeYamlPreamble(preamble: string, yaml: string): string {
+  if (!preamble) return yaml;
+  const toInject: string[] = [];
+  for (const line of preamble.split('\n')) {
+    const m = line.match(/^(\w+):/);
+    if (m && !new RegExp(`^${m[1]}:`, 'm').test(yaml)) {
+      toInject.push(line);
+    }
+  }
+  if (toInject.length === 0) return yaml;
+  return toInject.join('\n') + '\n' + yaml;
 }
 
 function getNonce(): string {
