@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as vscode from 'vscode';
-import { isWorkflowFile, extractYamlPreamble, mergeYamlPreamble } from '../../visual-editor.js';
+import { isWorkflowFile, extractYamlPreamble, mergeYamlPreamble, resolveFullConfig, parseYamlModuleNames, parseYamlMappingKeys, parseYamlStringList } from '../../visual-editor.js';
 import { detectWorkflowFileType } from '../../file-detection.js';
 
 suite('Visual Editor', () => {
@@ -132,5 +132,105 @@ pipelines:
     fs.writeFileSync(onlyWorkflows, 'workflows:\n  http:\n    routes: []\n');
     const doc2 = await vscode.workspace.openTextDocument(onlyWorkflows);
     assert.ok(!isWorkflowFile(doc2), 'workflows: alone should not match');
+  });
+
+  test('partial file resolves full workspace config via resolveFullConfig', () => {
+    // Create root config that imports a partial
+    const rootYaml = [
+      'name: my-app',
+      'version: "1.0"',
+      'modules:',
+      '  - name: web',
+      '    type: http.server',
+      'workflows:',
+      '  http:',
+      '    routes: []',
+      'imports:',
+      '  - partials/auth.yaml',
+    ].join('\n') + '\n';
+
+    const partialYaml = [
+      'pipelines:',
+      '  auth-pipeline:',
+      '    steps: []',
+      '  login-pipeline:',
+      '    steps: []',
+    ].join('\n') + '\n';
+
+    const rootPath = path.join(tmpDir, 'app.yaml');
+    const partialDir = path.join(tmpDir, 'partials');
+    fs.mkdirSync(partialDir);
+    fs.writeFileSync(rootPath, rootYaml);
+    fs.writeFileSync(path.join(partialDir, 'auth.yaml'), partialYaml);
+
+    const { yaml, sourceMap } = resolveFullConfig(rootPath);
+
+    // Merged yaml should contain both root and partial content
+    assert.ok(yaml.includes('modules:'), 'Merged yaml should contain modules');
+    assert.ok(yaml.includes('pipelines:'), 'Merged yaml should contain pipelines');
+    assert.ok(yaml.includes('auth-pipeline'), 'Merged yaml should include auth-pipeline');
+    assert.ok(yaml.includes('login-pipeline'), 'Merged yaml should include login-pipeline');
+    assert.ok(yaml.includes('name: my-app'), 'Merged yaml should include root preamble');
+
+    // imports section should not appear in merged output
+    assert.ok(!yaml.includes('imports:'), 'Merged yaml should not include imports section');
+  });
+
+  test('sourceMap tracks correct file for each node', () => {
+    const rootPath = path.join(tmpDir, 'app.yaml');
+    const modulesPath = path.join(tmpDir, 'modules.yaml');
+    const pipelinesPath = path.join(tmpDir, 'pipelines', 'auth.yaml');
+    fs.mkdirSync(path.join(tmpDir, 'pipelines'));
+
+    fs.writeFileSync(rootPath, [
+      'modules:',
+      '  - name: web',
+      '    type: http.server',
+      'workflows:',
+      '  http:',
+      '    routes: []',
+      'imports:',
+      '  - modules.yaml',
+      '  - pipelines/auth.yaml',
+    ].join('\n') + '\n');
+
+    fs.writeFileSync(modulesPath, [
+      'modules:',
+      '  - name: db',
+      '    type: postgres',
+      '  - name: cache',
+      '    type: redis',
+    ].join('\n') + '\n');
+
+    fs.writeFileSync(pipelinesPath, [
+      'pipelines:',
+      '  auth-pipeline:',
+      '    steps: []',
+    ].join('\n') + '\n');
+
+    const { sourceMap } = resolveFullConfig(rootPath);
+
+    assert.strictEqual(sourceMap['web'], rootPath, 'web module should map to root file');
+    assert.strictEqual(sourceMap['db'], modulesPath, 'db module should map to modules.yaml');
+    assert.strictEqual(sourceMap['cache'], modulesPath, 'cache module should map to modules.yaml');
+    assert.strictEqual(sourceMap['auth-pipeline'], pipelinesPath, 'auth-pipeline should map to pipelines/auth.yaml');
+  });
+
+  test('parseYamlModuleNames extracts module names from yaml', () => {
+    const yaml = 'modules:\n  - name: web\n    type: http.server\n  - name: db\n    type: postgres\n';
+    const names = parseYamlModuleNames(yaml);
+    assert.deepStrictEqual(names, ['web', 'db']);
+  });
+
+  test('parseYamlMappingKeys extracts pipeline names from yaml', () => {
+    const yaml = 'pipelines:\n  my-pipeline:\n    steps: []\n  other-pipeline:\n    steps: []\n';
+    const keys = parseYamlMappingKeys(yaml, 'pipelines');
+    assert.deepStrictEqual(keys, ['my-pipeline', 'other-pipeline']);
+  });
+
+  test('parseYamlStringList extracts imports list from yaml', () => {
+    const yaml = 'imports:\n  - partials/auth.yaml\n  - modules.yaml\n';
+    const imports = parseYamlStringList(yaml, 'imports');
+    assert.deepStrictEqual(imports, ['partials/auth.yaml', 'modules.yaml']);
   });
 });

@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { discoverPluginSchemas } from './plugin-discovery';
 import { detectWorkflowFileType } from './file-detection';
+import { discoverConfigRoot } from './workspace-discovery';
 
 export class WorkflowVisualEditorProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -10,21 +11,57 @@ export class WorkflowVisualEditorProvider {
   private updatingFromEditor = false;
   private updatingFromWebview = false;
   private yamlPreamble: string = '';
+  private sourceMap: Record<string, string> = {};
+  private rootConfigPath: string | undefined;
 
   constructor(private context: vscode.ExtensionContext) {}
 
-  public open(document: vscode.TextDocument) {
+  public async open(document: vscode.TextDocument) {
     this.document = document;
 
+    // Detect partial files and resolve the full merged config from workspace
+    const fileType = detectWorkflowFileType(document);
+    if (fileType === 'partial') {
+      const rootConfig = await discoverConfigRoot(document.fileName);
+      if (rootConfig) {
+        try {
+          const resolved = resolveFullConfig(rootConfig);
+          this.sourceMap = resolved.sourceMap;
+          this.rootConfigPath = rootConfig;
+          this.openWithContent(document, resolved.yaml, rootConfig);
+          return;
+        } catch (err) {
+          vscode.window.showWarningMessage(
+            `Could not resolve workspace config from ${path.basename(rootConfig)}: ${err}`
+          );
+        }
+      } else {
+        vscode.window.showWarningMessage(
+          'Could not find a root workflow config for this partial file. Open the root config to use the visual editor.'
+        );
+        return;
+      }
+    }
+
+    this.sourceMap = {};
+    this.rootConfigPath = undefined;
+    this.openWithContent(document, document.getText());
+  }
+
+  private openWithContent(document: vscode.TextDocument, yamlContent: string, rootConfigPath?: string) {
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Beside);
-      this.sendYamlToEditor(document.getText());
+      this.sendYamlToEditor(yamlContent);
       return;
     }
 
+    const title = rootConfigPath
+      ? `Workflow: ${path.basename(document.fileName)} (via ${path.basename(rootConfigPath)})`
+      : `Workflow: ${path.basename(document.fileName)}`;
+
     this.panel = vscode.window.createWebviewPanel(
       'workflowVisualEditor',
-      'Workflow: ' + path.basename(document.fileName),
+      title,
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
@@ -36,7 +73,7 @@ export class WorkflowVisualEditorProvider {
     );
 
     this.panel.webview.html = this.getHtml(this.panel.webview);
-    this.sendYamlToEditor(document.getText());
+    this.sendYamlToEditor(yamlContent);
     this.setupMessageHandling();
     this.setupDocumentSync();
 
@@ -66,8 +103,21 @@ export class WorkflowVisualEditorProvider {
         case 'saveFiles':
           this.handleSaveFiles(msg.entries);
           break;
+        case 'saveToFile':
+          this.handleSaveToFile(msg.filePath, msg.content);
+          break;
         case 'ready':
-          this.sendYamlToEditor(this.document!.getText());
+          if (this.rootConfigPath) {
+            try {
+              const resolved = resolveFullConfig(this.rootConfigPath);
+              this.sourceMap = resolved.sourceMap;
+              this.sendYamlToEditorWithSourceMap(resolved.yaml, resolved.sourceMap, this.document!.fileName);
+            } catch {
+              this.sendYamlToEditor(this.document!.getText());
+            }
+          } else {
+            this.sendYamlToEditor(this.document!.getText());
+          }
           this.sendSchemas();
           break;
         case 'layoutChanged': {
@@ -115,7 +165,28 @@ export class WorkflowVisualEditorProvider {
     if (!this.updatingFromWebview) {
       this.yamlPreamble = extractYamlPreamble(content);
     }
-    this.panel?.webview.postMessage({ type: 'yamlChanged', content });
+    const msg: Record<string, unknown> = { type: 'yamlChanged', content };
+    if (Object.keys(this.sourceMap).length > 0) {
+      msg.sourceMap = this.sourceMap;
+      msg.activeFile = this.document?.fileName;
+    }
+    this.panel?.webview.postMessage(msg);
+    await this.loadSidecarLayout();
+  }
+
+  private async sendYamlToEditorWithSourceMap(
+    content: string,
+    sourceMap: Record<string, string>,
+    activeFile: string
+  ) {
+    if (!this.updatingFromWebview) {
+      this.yamlPreamble = extractYamlPreamble(content);
+    }
+    this.panel?.webview.postMessage({ type: 'yamlChanged', content, sourceMap, activeFile });
+    await this.loadSidecarLayout();
+  }
+
+  private async loadSidecarLayout() {
     if (this.document) {
       const uri = this.document.uri;
       const sidecarUri = vscode.Uri.file(uri.fsPath.replace(/\.ya?ml$/, '.workflow-editor.json'));
@@ -295,6 +366,16 @@ Rules:
     }
   }
 
+  private async handleSaveToFile(filePath: string, content: string) {
+    const targetUri = vscode.Uri.file(filePath);
+    const encoder = new TextEncoder();
+    const targetDir = path.dirname(filePath);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    await vscode.workspace.fs.writeFile(targetUri, encoder.encode(content));
+  }
+
   private getHtml(webview: vscode.Webview): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'webview-dist', 'index.js')
@@ -345,9 +426,22 @@ export function promptWorkflowDetection(document: vscode.TextDocument) {
   const fileType = detectWorkflowFileType(document);
 
   if (fileType === 'partial') {
-    vscode.window.showInformationMessage(
-      'This file appears to be a partial workflow config (pipelines only). Open the root config file to use the visual editor.'
-    );
+    discoverConfigRoot(document.fileName).then((rootConfig) => {
+      if (rootConfig) {
+        vscode.window.showInformationMessage(
+          `This is a partial workflow config. Open the visual editor? (Workspace config: ${path.basename(rootConfig)})`,
+          'Open Visual Editor'
+        ).then((choice) => {
+          if (choice === 'Open Visual Editor') {
+            vscode.commands.executeCommand('workflow.openVisualEditor');
+          }
+        });
+      } else {
+        vscode.window.showInformationMessage(
+          'This file appears to be a partial workflow config. Open the root config file to use the visual editor.'
+        );
+      }
+    });
     return;
   }
 
@@ -369,6 +463,193 @@ export function promptWorkflowDetection(document: vscode.TextDocument) {
       vscode.workspace.getConfiguration('workflow').update('suppressDetectionPrompt', true, vscode.ConfigurationTarget.Global);
     }
   });
+}
+
+/**
+ * Resolve a full merged workflow config from a root config file, following
+ * imports and building a sourceMap that tracks which file each top-level
+ * entity (module name, pipeline name) originated from.
+ */
+export function resolveFullConfig(rootPath: string): { yaml: string; sourceMap: Record<string, string> } {
+  const rootDir = path.dirname(rootPath);
+  const rootContent = fs.readFileSync(rootPath, 'utf-8');
+  const sourceMap: Record<string, string> = {};
+
+  // Track entities from root
+  for (const name of parseYamlModuleNames(rootContent)) {
+    sourceMap[name] = rootPath;
+  }
+  for (const name of parseYamlMappingKeys(rootContent, 'pipelines')) {
+    sourceMap[name] = rootPath;
+  }
+
+  // Follow imports
+  const imports = parseYamlStringList(rootContent, 'imports');
+  const importedSections: string[] = [];
+
+  for (const importPath of imports) {
+    const fullPath = path.resolve(rootDir, importPath);
+    let importContent: string;
+    try {
+      importContent = fs.readFileSync(fullPath, 'utf-8');
+    } catch {
+      continue;
+    }
+
+    for (const name of parseYamlModuleNames(importContent)) {
+      sourceMap[name] = fullPath;
+    }
+    for (const name of parseYamlMappingKeys(importContent, 'pipelines')) {
+      sourceMap[name] = fullPath;
+    }
+
+    // Collect sections to merge (strip top-level keys we'll merge into root)
+    const modulesBlock = extractYamlSection(importContent, 'modules');
+    const pipelinesBlock = extractYamlSection(importContent, 'pipelines');
+    const workflowsBlock = extractYamlSection(importContent, 'workflows');
+    if (modulesBlock) importedSections.push(modulesBlock);
+    if (pipelinesBlock) importedSections.push(pipelinesBlock);
+    if (workflowsBlock) importedSections.push(workflowsBlock);
+  }
+
+  // Build merged YAML: root without imports section + appended import sections
+  const rootWithoutImports = removeYamlSection(rootContent, 'imports');
+  const yaml = importedSections.length > 0
+    ? rootWithoutImports.trimEnd() + '\n' + importedSections.join('\n')
+    : rootWithoutImports;
+
+  return { yaml, sourceMap };
+}
+
+/** Extract a top-level YAML section block (key + its indented content). */
+function extractYamlSection(content: string, key: string): string {
+  const lines = content.split('\n');
+  let inSection = false;
+  const result: string[] = [];
+
+  for (const line of lines) {
+    if (!inSection) {
+      if (new RegExp(`^${key}:`).test(line)) {
+        inSection = true;
+        result.push(line);
+      }
+    } else {
+      // Continue while indented or blank
+      if (line === '' || /^\s/.test(line)) {
+        result.push(line);
+      } else {
+        break;
+      }
+    }
+  }
+
+  return result.length > 0 ? result.join('\n') : '';
+}
+
+/** Remove a top-level YAML section block from content. */
+function removeYamlSection(content: string, key: string): string {
+  const lines = content.split('\n');
+  const result: string[] = [];
+  let inSection = false;
+
+  for (const line of lines) {
+    if (!inSection) {
+      if (new RegExp(`^${key}:`).test(line)) {
+        inSection = true;
+      } else {
+        result.push(line);
+      }
+    } else {
+      // End section when non-indented, non-blank line appears
+      if (line !== '' && !/^\s/.test(line)) {
+        inSection = false;
+        result.push(line);
+      }
+    }
+  }
+
+  return result.join('\n');
+}
+
+/** Parse a YAML list of strings under a top-level key (e.g. imports: [...]). */
+export function parseYamlStringList(content: string, key: string): string[] {
+  const lines = content.split('\n');
+  let inSection = false;
+  const items: string[] = [];
+
+  for (const line of lines) {
+    if (!inSection) {
+      if (new RegExp(`^${key}:`).test(line)) {
+        // Inline list: imports: [a, b]
+        const inline = line.match(/\[([^\]]+)\]/);
+        if (inline) {
+          return inline[1].split(',').map((s) => s.trim().replace(/['"]/g, ''));
+        }
+        inSection = true;
+      }
+    } else {
+      const item = line.match(/^\s+-\s+(.+)/);
+      if (item) {
+        items.push(item[1].trim().replace(/['"]/g, ''));
+      } else if (line !== '' && !/^\s/.test(line)) {
+        break;
+      }
+    }
+  }
+
+  return items;
+}
+
+/** Parse module names from a YAML modules: array (looks for `name:` keys). */
+export function parseYamlModuleNames(content: string): string[] {
+  const lines = content.split('\n');
+  let inModules = false;
+  const names: string[] = [];
+
+  for (const line of lines) {
+    if (!inModules) {
+      if (/^modules:/.test(line)) {
+        inModules = true;
+      }
+    } else {
+      if (line !== '' && !/^\s/.test(line)) {
+        break; // Left modules section
+      }
+      // Match both "  - name: web" (list item) and "    name: web" (property)
+      const m = line.match(/^\s+(?:-\s+)?name:\s+(\S+)/);
+      if (m) {
+        names.push(m[1].replace(/['"]/g, ''));
+      }
+    }
+  }
+
+  return names;
+}
+
+/** Parse keys of a YAML mapping section (e.g. pipelines: { key1: ..., key2: ... }). */
+export function parseYamlMappingKeys(content: string, section: string): string[] {
+  const lines = content.split('\n');
+  let inSection = false;
+  const keys: string[] = [];
+
+  for (const line of lines) {
+    if (!inSection) {
+      if (new RegExp(`^${section}:`).test(line)) {
+        inSection = true;
+      }
+    } else {
+      if (line !== '' && !/^\s/.test(line)) {
+        break;
+      }
+      // Two-space indented keys (direct children of the section)
+      const m = line.match(/^  (\S[^:]+):/);
+      if (m) {
+        keys.push(m[1].trim());
+      }
+    }
+  }
+
+  return keys;
 }
 
 // Preamble keys that live at the top level of a workflow config and may be
