@@ -251,6 +251,8 @@ export class WorkflowVisualEditorProvider {
           editor.selection = new vscode.Selection(pos, pos);
           editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
         });
+      }).catch(() => {
+        vscode.window.showErrorMessage(`Workflow editor: could not open file '${filePath}'`);
       });
       return;
     }
