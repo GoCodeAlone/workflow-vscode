@@ -51,6 +51,11 @@
         {
           "id": "workflowPluginMarketplace",
           "name": "Plugin Marketplace"
+        },
+        {
+          "type": "webview",
+          "id": "workflowDslReference",
+          "name": "DSL Reference"
         }
       ]
     },
@@ -106,6 +111,11 @@
       {
         "command": "workflow.testCoverage",
         "title": "Workflow: Test Coverage"
+      },
+      {
+        "command": "workflow.openDslReference",
+        "title": "Workflow: Show DSL Reference",
+        "icon": "$(book)"
       }
     ],
     "menus": {
@@ -125,6 +135,11 @@
         {
           "command": "workflow.refreshMarketplace",
           "when": "view == workflowPluginMarketplace",
+          "group": "navigation"
+        },
+        {
+          "command": "workflow.openDslReference",
+          "when": "view == workflowDslReference",
           "group": "navigation"
         }
       ],

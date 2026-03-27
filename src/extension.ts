@@ -11,6 +11,7 @@ import { discoverConfigRoot } from './workspace-discovery.js';
 import { registerPipelineNavigation } from './pipeline-navigation.js';
 import { checkBinaryVersion } from './version-check.js';
 import { parseTestOutput, applyTestDecorations } from './test-results.js';
+import { DslReferenceViewProvider } from './dsl-reference.js';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel('Workflow');
@@ -106,6 +107,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       proc.on('error', (err) => {
         vscode.window.showErrorMessage(`wfctl error: ${err.message}`);
       });
+    })
+  );
+
+  // Register DSL reference view
+  const dslReferenceProvider = new DslReferenceViewProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(DslReferenceViewProvider.viewType, dslReferenceProvider),
+    vscode.commands.registerCommand('workflow.openDslReference', () => {
+      vscode.commands.executeCommand('workflowDslReference.focus');
     })
   );
 
