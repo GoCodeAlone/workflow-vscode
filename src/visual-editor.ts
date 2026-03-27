@@ -246,7 +246,7 @@ export class WorkflowVisualEditorProvider {
 
     // Cross-file navigation: open the target file if different from current document
     if (filePath && filePath !== this.document?.uri.fsPath) {
-      vscode.workspace.openTextDocument(vscode.Uri.file(filePath)).then((doc) => {
+      Promise.resolve(vscode.workspace.openTextDocument(vscode.Uri.file(filePath))).then((doc) => {
         vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true }).then((editor) => {
           editor.selection = new vscode.Selection(pos, pos);
           editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
