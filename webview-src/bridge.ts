@@ -13,6 +13,10 @@ export interface BridgeCallbacks {
   onSchemasLoaded: (schemas: unknown) => void;
   onPluginSchemasLoaded?: (plugins: unknown[]) => void;
   onAIResponse?: (content: string) => void;
+  /** Host → webview: navigate to node at (filePath, line). Uses line map to select node. */
+  onNavigateToNode?: (filePath: string | null, line: number) => void;
+  /** Host → webview: an imported file's content changed. */
+  onFileChanged?: (filePath: string, content: string) => void;
 }
 
 let callbacks: BridgeCallbacks | null = null;
@@ -50,6 +54,12 @@ export function initBridge(cb: BridgeCallbacks) {
         }
         break;
       }
+      case 'navigateToNode':
+        callbacks?.onNavigateToNode?.(msg.filePath ?? null, msg.line);
+        break;
+      case 'fileChanged':
+        callbacks?.onFileChanged?.(msg.filePath, msg.content);
+        break;
     }
   });
 
@@ -61,8 +71,12 @@ export function sendYamlUpdated(content: string) {
   vscode.postMessage({ type: 'yamlUpdated', content });
 }
 
-export function sendNavigateToLine(line: number, col: number) {
-  vscode.postMessage({ type: 'navigateToLine', line, col });
+/** Navigate to a specific line in the host editor.
+ *  When filePath is provided, the host will open that file before navigating. */
+export function sendNavigateToLine(line: number, col: number, filePath?: string | null) {
+  const msg: Record<string, unknown> = { type: 'navigateToLine', line, col };
+  if (filePath !== undefined) msg.filePath = filePath;
+  vscode.postMessage(msg);
 }
 
 export function sendRequestSchemas() {

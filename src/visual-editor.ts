@@ -89,7 +89,7 @@ export class WorkflowVisualEditorProvider {
           this.handleYamlFromWebview(msg.content);
           break;
         case 'navigateToLine':
-          this.navigateToLine(msg.line, msg.col);
+          this.navigateToLine(msg.line, msg.col, msg.filePath);
           break;
         case 'requestSchemas':
           this.sendSchemas();
@@ -132,12 +132,26 @@ export class WorkflowVisualEditorProvider {
   }
 
   private setupDocumentSync() {
-    // Watch for text editor changes
+    // Watch for text editor changes (main file and imported files)
     const docSyncDisposable = vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document === this.document && !this.updatingFromWebview) {
         this.updatingFromEditor = true;
         this.sendYamlToEditor(e.document.getText());
         this.updatingFromEditor = false;
+      } else if (this.isTrackedImport(e.document.uri.fsPath)) {
+        // An imported file changed — notify webview and re-resolve merged config
+        this.panel?.webview.postMessage({
+          type: 'fileChanged',
+          filePath: e.document.uri.fsPath,
+          content: e.document.getText(),
+        });
+        if (this.rootConfigPath) {
+          try {
+            const resolved = resolveFullConfig(this.rootConfigPath);
+            this.sourceMap = resolved.sourceMap;
+            this.sendYamlToEditorWithSourceMap(resolved.yaml, resolved.sourceMap, this.document!.fileName);
+          } catch { /* ignore resolution errors */ }
+        }
       }
     });
 
@@ -145,10 +159,14 @@ export class WorkflowVisualEditorProvider {
     const cursorSyncDisposable = vscode.window.onDidChangeTextEditorSelection((e) => {
       if (e.textEditor.document === this.document) {
         const pos = e.selections[0].active;
+        const line = pos.line + 1;
+        const col = pos.character + 1;
+        this.panel?.webview.postMessage({ type: 'cursorMoved', line, col });
+        // Also send navigateToNode so the webview can select the corresponding node
         this.panel?.webview.postMessage({
-          type: 'cursorMoved',
-          line: pos.line + 1,
-          col: pos.character + 1,
+          type: 'navigateToNode',
+          filePath: this.document.uri.fsPath,
+          line,
         });
       }
     });
@@ -158,6 +176,11 @@ export class WorkflowVisualEditorProvider {
       docSyncDisposable.dispose();
       cursorSyncDisposable.dispose();
     });
+  }
+
+  /** Returns true when filePath is one of the imported files tracked in the source map. */
+  private isTrackedImport(filePath: string): boolean {
+    return Object.values(this.sourceMap).includes(filePath);
   }
 
   private async sendYamlToEditor(content: string) {
@@ -218,13 +241,26 @@ export class WorkflowVisualEditorProvider {
     this.updatingFromWebview = false;
   }
 
-  private navigateToLine(line: number, col: number) {
+  private navigateToLine(line: number, col: number, filePath?: string | null) {
+    const pos = new vscode.Position(line - 1, Math.max(0, col - 1));
+
+    // Cross-file navigation: open the target file if different from current document
+    if (filePath && filePath !== this.document?.uri.fsPath) {
+      vscode.workspace.openTextDocument(vscode.Uri.file(filePath)).then((doc) => {
+        vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true }).then((editor) => {
+          editor.selection = new vscode.Selection(pos, pos);
+          editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+        });
+      });
+      return;
+    }
+
+    // Same-file navigation
     if (!this.document) return;
     const editor = vscode.window.visibleTextEditors.find(
       (e) => e.document === this.document
     );
     if (editor) {
-      const pos = new vscode.Position(line - 1, col - 1);
       editor.selection = new vscode.Selection(pos, pos);
       editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
     }
