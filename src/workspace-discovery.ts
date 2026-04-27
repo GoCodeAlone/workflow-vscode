@@ -34,20 +34,33 @@ function readWorkflowJson(dir: string): WorkflowJsonOverride | null {
 function isRootConfig(filePath: string): boolean {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
+    const baseName = path.basename(filePath);
+    if (baseName === 'infra.yaml' || baseName === 'infra.yml') {
+      return content.includes('modules:');
+    }
     return content.includes('modules:') && content.includes('workflows:');
   } catch {
     return false;
   }
 }
 
-const ROOT_YAML_NAMES = ['app.yaml', 'app.yml', 'workflow.yaml', 'workflow.yml', 'config.yaml', 'config.yml'];
+const ROOT_YAML_NAMES = [
+  'app.yaml',
+  'app.yml',
+  'workflow.yaml',
+  'workflow.yml',
+  'infra.yaml',
+  'infra.yml',
+  'config.yaml',
+  'config.yml',
+];
 
 /**
  * Walk up directories from fromPath to find the workflow config root.
  * Priority:
  * 1. .workflow.json configRoot override in any parent directory
  * 2. IDE setting workflow.configRoot
- * 3. Known root filenames (app.yaml, workflow.yaml, config.yaml)
+ * 3. Known root filenames (app.yaml, workflow.yaml, infra.yaml, config.yaml)
  * 4. Any YAML with modules: + workflows:
  */
 export async function discoverConfigRoot(fromPath: string): Promise<string | null> {

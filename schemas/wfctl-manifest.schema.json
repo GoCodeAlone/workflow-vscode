@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gocodealone.com/schemas/wfctl-manifest.schema.json",
+  "title": "wfctl Manifest",
+  "description": "Manifest for wfctl plugin and registry configuration.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "version": {
+      "description": "Manifest format version.",
+      "type": ["string", "number"]
+    },
+    "plugins": {
+      "description": "Plugins to install or make available to wfctl.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "repository": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "registries": {
+      "description": "Plugin registries wfctl can resolve plugins from.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

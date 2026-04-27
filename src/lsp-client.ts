@@ -176,6 +176,8 @@ export const LSP_DOCUMENT_SELECTOR = [
   { scheme: 'file', language: 'yaml', pattern: '**/workflow.yml' },
   { scheme: 'file', language: 'yaml', pattern: '**/app.yaml' },
   { scheme: 'file', language: 'yaml', pattern: '**/app.yml' },
+  { scheme: 'file', language: 'yaml', pattern: '**/infra.yaml' },
+  { scheme: 'file', language: 'yaml', pattern: '**/infra.yml' },
 ] as const;
 
 export async function startLspClient(

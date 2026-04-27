@@ -40,11 +40,30 @@ suite('Extension Resources', () => {
     assert.ok(fs.existsSync(filePath), `Expected ${filePath} to exist`);
   });
 
+  test('schemas/wfctl-manifest.schema.json exists', () => {
+    const filePath = path.join(extensionRoot, 'schemas', 'wfctl-manifest.schema.json');
+    assert.ok(fs.existsSync(filePath), `Expected ${filePath} to exist`);
+  });
+
   test('schema is valid JSON with $schema key', () => {
     const filePath = path.join(extensionRoot, 'schemas', 'workflow-config.schema.json');
     const content = fs.readFileSync(filePath, 'utf-8');
     const schema = JSON.parse(content);
     assert.ok(schema['$schema'], 'Schema must have a $schema key');
+  });
+
+  test('wfctl manifest schema accepts manifest fields without requiring app modules', () => {
+    const filePath = path.join(extensionRoot, 'schemas', 'wfctl-manifest.schema.json');
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const schema = JSON.parse(content);
+    assert.ok(schema['$schema'], 'wfctl manifest schema must have a $schema key');
+    assert.ok(schema.properties.version, 'wfctl manifest schema must define version');
+    assert.ok(schema.properties.plugins, 'wfctl manifest schema must define plugins');
+    assert.ok(schema.properties.registries, 'wfctl manifest schema must define registries');
+    assert.ok(
+      !schema.required?.includes('modules'),
+      'wfctl manifest schema must not require Workflow app modules',
+    );
   });
 
   test('snippets/workflow.json exists', () => {
@@ -86,15 +105,64 @@ suite('Extension Resources', () => {
     }
   });
 
-  test('yamlValidation is configured for workflow files', () => {
+  test('yamlValidation associates workflow schema with app root files only', () => {
     const yamlValidation = packageJson.contributes.yamlValidation || [];
     assert.ok(
       yamlValidation.length > 0,
       'Must have yamlValidation entries for workflow YAML files',
     );
-    const patterns = yamlValidation.flatMap((e: { fileMatch: string[] }) => e.fileMatch);
-    assert.ok(patterns.some((p: string) => p.includes('workflow.yaml')), 'Must match workflow.yaml');
-    assert.ok(patterns.some((p: string) => p.includes('app.yaml')), 'Must match app.yaml');
+    const workflowEntry = yamlValidation.find(
+      (e: { url: string }) => e.url === './schemas/workflow-config.schema.json',
+    );
+    assert.ok(workflowEntry, 'Must have workflow config schema yamlValidation entry');
+    const patterns = workflowEntry.fileMatch;
+    for (const fileName of [
+      'workflow.yaml',
+      'workflow.yml',
+      'app.yaml',
+      'app.yml',
+      'infra.yaml',
+      'infra.yml',
+    ]) {
+      assert.ok(
+        patterns.includes(fileName),
+        `yamlValidation must associate workflow schema with ${fileName}`,
+      );
+    }
+    assert.ok(!patterns.includes('wfctl.yaml'), 'workflow app schema must not match wfctl.yaml');
+    assert.ok(!patterns.includes('wfctl.yml'), 'workflow app schema must not match wfctl.yml');
+  });
+
+  test('yamlValidation associates wfctl manifests with wfctl manifest schema', () => {
+    const yamlValidation = packageJson.contributes.yamlValidation || [];
+    const wfctlEntry = yamlValidation.find(
+      (e: { url: string }) => e.url === './schemas/wfctl-manifest.schema.json',
+    );
+    assert.ok(wfctlEntry, 'Must have wfctl manifest schema yamlValidation entry');
+    assert.deepStrictEqual(
+      wfctlEntry.fileMatch,
+      ['wfctl.yaml', 'wfctl.yml'],
+      'wfctl manifests must use the wfctl manifest schema only',
+    );
+  });
+
+  test('activation events include all workflow root file names', () => {
+    const activationEvents: string[] = packageJson.activationEvents || [];
+    for (const fileName of [
+      'workflow.yaml',
+      'workflow.yml',
+      'app.yaml',
+      'app.yml',
+      'wfctl.yaml',
+      'wfctl.yml',
+      'infra.yaml',
+      'infra.yml',
+    ]) {
+      assert.ok(
+        activationEvents.includes(`workspaceContains:**/${fileName}`),
+        `activationEvents must include ${fileName}`,
+      );
+    }
   });
 
   test('LSP startup is non-blocking in extension.ts', () => {

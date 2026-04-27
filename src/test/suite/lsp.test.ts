@@ -77,19 +77,31 @@ suite('LSP Server', () => {
 
   // ── Document selector coverage ───────────────────────────────────────
 
-  test('LSP document selector includes workflow YAML patterns', () => {
-    const patterns = LSP_DOCUMENT_SELECTOR.map((s) => s.pattern);
-    assert.ok(patterns.includes('**/workflow.yaml'), 'Must match workflow.yaml');
-    assert.ok(patterns.includes('**/workflow.yml'), 'Must match workflow.yml');
-    assert.ok(patterns.includes('**/app.yaml'), 'Must match app.yaml');
-    assert.ok(patterns.includes('**/app.yml'), 'Must match app.yml');
+  test('LSP document selector includes workflow app YAML root patterns', () => {
+    const patterns: readonly string[] = LSP_DOCUMENT_SELECTOR.map((s) => s.pattern);
+    for (const fileName of [
+      'workflow.yaml',
+      'workflow.yml',
+      'app.yaml',
+      'app.yml',
+      'infra.yaml',
+      'infra.yml',
+    ]) {
+      assert.ok(patterns.includes(`**/${fileName}`), `Must match ${fileName}`);
+    }
   });
 
-  test('LSP document selector has exactly 4 patterns', () => {
+  test('LSP document selector excludes wfctl manifests', () => {
+    const patterns: readonly string[] = LSP_DOCUMENT_SELECTOR.map((s) => s.pattern);
+    assert.ok(!patterns.includes('**/wfctl.yaml'), 'wfctl.yaml must not be handled by Workflow app LSP');
+    assert.ok(!patterns.includes('**/wfctl.yml'), 'wfctl.yml must not be handled by Workflow app LSP');
+  });
+
+  test('LSP document selector has exactly 6 root patterns', () => {
     assert.strictEqual(
       LSP_DOCUMENT_SELECTOR.length,
-      4,
-      `Expected 4 document selector entries, got ${LSP_DOCUMENT_SELECTOR.length}`,
+      6,
+      `Expected 6 document selector entries, got ${LSP_DOCUMENT_SELECTOR.length}`,
     );
   });
 
