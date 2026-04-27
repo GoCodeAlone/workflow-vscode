@@ -205,12 +205,17 @@
           "workflow.yml",
           "app.yaml",
           "app.yml",
-          "wfctl.yaml",
-          "wfctl.yml",
           "infra.yaml",
           "infra.yml"
         ],
         "url": "./schemas/workflow-config.schema.json"
+      },
+      {
+        "fileMatch": [
+          "wfctl.yaml",
+          "wfctl.yml"
+        ],
+        "url": "./schemas/wfctl-manifest.schema.json"
       },
       {
         "fileMatch": [
