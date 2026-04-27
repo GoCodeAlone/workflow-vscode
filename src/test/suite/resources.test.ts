@@ -86,15 +86,47 @@ suite('Extension Resources', () => {
     }
   });
 
-  test('yamlValidation is configured for workflow files', () => {
+  test('yamlValidation is configured for workflow root files', () => {
     const yamlValidation = packageJson.contributes.yamlValidation || [];
     assert.ok(
       yamlValidation.length > 0,
       'Must have yamlValidation entries for workflow YAML files',
     );
     const patterns = yamlValidation.flatMap((e: { fileMatch: string[] }) => e.fileMatch);
-    assert.ok(patterns.some((p: string) => p.includes('workflow.yaml')), 'Must match workflow.yaml');
-    assert.ok(patterns.some((p: string) => p.includes('app.yaml')), 'Must match app.yaml');
+    for (const fileName of [
+      'workflow.yaml',
+      'workflow.yml',
+      'app.yaml',
+      'app.yml',
+      'wfctl.yaml',
+      'wfctl.yml',
+      'infra.yaml',
+      'infra.yml',
+    ]) {
+      assert.ok(
+        patterns.includes(fileName),
+        `yamlValidation must associate workflow schema with ${fileName}`,
+      );
+    }
+  });
+
+  test('activation events include all workflow root file names', () => {
+    const activationEvents: string[] = packageJson.activationEvents || [];
+    for (const fileName of [
+      'workflow.yaml',
+      'workflow.yml',
+      'app.yaml',
+      'app.yml',
+      'wfctl.yaml',
+      'wfctl.yml',
+      'infra.yaml',
+      'infra.yml',
+    ]) {
+      assert.ok(
+        activationEvents.includes(`workspaceContains:**/${fileName}`),
+        `activationEvents must include ${fileName}`,
+      );
+    }
   });
 
   test('LSP startup is non-blocking in extension.ts', () => {

@@ -14,7 +14,7 @@ IDE support for [Workflow Engine](https://github.com/GoCodeAlone/workflow) confi
 
 ### Real-Time Validation
 
-The extension connects to `workflow-lsp-server` (downloaded automatically on first activation) and surfaces diagnostics as you type in any `workflow.yaml`, `workflow.yml`, `app.yaml`, or `app.yml` file:
+The extension connects to `workflow-lsp-server` (downloaded automatically on first activation) and surfaces diagnostics as you type in any `workflow.yaml`, `workflow.yml`, `app.yaml`, `app.yml`, `wfctl.yaml`, `wfctl.yml`, `infra.yaml`, or `infra.yml` file:
 
 - Unknown module types, step types, and trigger types
 - Missing `dependsOn` references
@@ -85,7 +85,7 @@ On workspace open, the extension offers to register `wfctl mcp` in `.vscode/mcp.
 
 ### JSON Schema Validation
 
-A bundled JSON Schema (`schemas/workflow-config.schema.json`) provides baseline validation for `workflow.yaml`, `workflow.yml`, `app.yaml`, and `app.yml` files even when the LSP server is disabled.
+A bundled JSON Schema (`schemas/workflow-config.schema.json`) provides baseline validation for `workflow.yaml`, `workflow.yml`, `app.yaml`, `app.yml`, `wfctl.yaml`, `wfctl.yml`, `infra.yaml`, and `infra.yml` files even when the LSP server is disabled.
 
 ---
 

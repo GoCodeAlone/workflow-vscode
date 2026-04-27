@@ -30,6 +30,10 @@
     "workspaceContains:**/workflow.yml",
     "workspaceContains:**/app.yaml",
     "workspaceContains:**/app.yml",
+    "workspaceContains:**/wfctl.yaml",
+    "workspaceContains:**/wfctl.yml",
+    "workspaceContains:**/infra.yaml",
+    "workspaceContains:**/infra.yml",
     "onView:workflowPluginMarketplace"
   ],
   "main": "./out/extension.js",
@@ -200,7 +204,11 @@
           "workflow.yaml",
           "workflow.yml",
           "app.yaml",
-          "app.yml"
+          "app.yml",
+          "wfctl.yaml",
+          "wfctl.yml",
+          "infra.yaml",
+          "infra.yml"
         ],
         "url": "./schemas/workflow-config.schema.json"
       },

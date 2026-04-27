@@ -77,19 +77,27 @@ suite('LSP Server', () => {
 
   // ── Document selector coverage ───────────────────────────────────────
 
-  test('LSP document selector includes workflow YAML patterns', () => {
-    const patterns = LSP_DOCUMENT_SELECTOR.map((s) => s.pattern);
-    assert.ok(patterns.includes('**/workflow.yaml'), 'Must match workflow.yaml');
-    assert.ok(patterns.includes('**/workflow.yml'), 'Must match workflow.yml');
-    assert.ok(patterns.includes('**/app.yaml'), 'Must match app.yaml');
-    assert.ok(patterns.includes('**/app.yml'), 'Must match app.yml');
+  test('LSP document selector includes workflow YAML root patterns', () => {
+    const patterns: readonly string[] = LSP_DOCUMENT_SELECTOR.map((s) => s.pattern);
+    for (const fileName of [
+      'workflow.yaml',
+      'workflow.yml',
+      'app.yaml',
+      'app.yml',
+      'wfctl.yaml',
+      'wfctl.yml',
+      'infra.yaml',
+      'infra.yml',
+    ]) {
+      assert.ok(patterns.includes(`**/${fileName}`), `Must match ${fileName}`);
+    }
   });
 
-  test('LSP document selector has exactly 4 patterns', () => {
+  test('LSP document selector has exactly 8 root patterns', () => {
     assert.strictEqual(
       LSP_DOCUMENT_SELECTOR.length,
-      4,
-      `Expected 4 document selector entries, got ${LSP_DOCUMENT_SELECTOR.length}`,
+      8,
+      `Expected 8 document selector entries, got ${LSP_DOCUMENT_SELECTOR.length}`,
     );
   });
 
