@@ -2,7 +2,7 @@
   "name": "workflow-engine",
   "displayName": "Workflow Engine",
   "description": "IDE support for Workflow Engine configs — validation, autocomplete, snippets, and AI integration",
-  "version": "0.20.0",
+  "version": "0.20.100",
   "publisher": "GoCodeAlone",
   "license": "MIT",
   "repository": {
@@ -244,7 +244,7 @@
     "publish": "vsce publish"
   },
   "devDependencies": {
-    "@gocodealone/workflow-editor": "^0.20.0",
+    "@gocodealone/workflow-editor": "^0.20.1",
     "@types/mocha": "^10.0.0",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
