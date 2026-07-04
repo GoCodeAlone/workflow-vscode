@@ -76,13 +76,19 @@ suite('Command Arguments', () => {
     }
   });
 
-  test('all declared commands have a COMMAND_SPEC (except init and openVisualEditor)', () => {
+  test('all declared wfctl commands have a COMMAND_SPEC', () => {
     const packageJson = JSON.parse(
       fs.readFileSync(path.join(extensionRoot, 'package.json'), 'utf-8'),
     );
     const declaredCommands: string[] = packageJson.contributes.commands
       .map((c: { command: string }) => c.command)
-      .filter((c: string) => !['workflow.init', 'workflow.openVisualEditor', 'workflow.installPlugin', 'workflow.refreshMarketplace'].includes(c));
+      .filter((c: string) => ![
+        'workflow.init',
+        'workflow.openVisualEditor',
+        'workflow.installPlugin',
+        'workflow.refreshMarketplace',
+        'workflow.openDslReference',
+      ].includes(c));
 
     for (const cmd of declaredCommands) {
       assert.ok(
