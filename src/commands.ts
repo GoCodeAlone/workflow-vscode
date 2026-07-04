@@ -23,6 +23,15 @@ export const COMMAND_SPECS: Record<string, { args: (filePath?: string) => string
   'workflow.schema': {
     args: () => ['schema'],
   },
+  'workflow.test': {
+    args: (f) => ['test', f ?? '.'],
+  },
+  'workflow.testFile': {
+    args: (f) => f ? ['test', f] : ['test'],
+  },
+  'workflow.testCoverage': {
+    args: (f) => ['test', '--coverage', f ?? '.'],
+  },
 };
 
 let wfctlBinaryPath = 'wfctl';

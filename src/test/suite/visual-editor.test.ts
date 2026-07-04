@@ -120,18 +120,19 @@ pipelines:
     assert.strictEqual(versionCount, 1, 'version should not be duplicated');
   });
 
-  test('isWorkflowFile detects both modules and workflows keys', async () => {
-    // Only modules: without workflows: should NOT match
+  test('isWorkflowFile detects modules-only and workflows-only files as partials', async () => {
+    // Partial configs are valid editor entry points when a root config can be discovered.
     const onlyModules = path.join(tmpDir, 'modules-only.yaml');
     fs.writeFileSync(onlyModules, 'modules:\n  - name: x\n');
     const doc1 = await vscode.workspace.openTextDocument(onlyModules);
-    assert.ok(!isWorkflowFile(doc1), 'modules: alone should not match');
+    assert.strictEqual(detectWorkflowFileType(doc1), 'partial');
+    assert.ok(isWorkflowFile(doc1), 'modules: alone should match as a partial');
 
-    // Only workflows: without modules: should NOT match
     const onlyWorkflows = path.join(tmpDir, 'workflows-only.yaml');
     fs.writeFileSync(onlyWorkflows, 'workflows:\n  http:\n    routes: []\n');
     const doc2 = await vscode.workspace.openTextDocument(onlyWorkflows);
-    assert.ok(!isWorkflowFile(doc2), 'workflows: alone should not match');
+    assert.strictEqual(detectWorkflowFileType(doc2), 'partial');
+    assert.ok(isWorkflowFile(doc2), 'workflows: alone should match as a partial');
   });
 
   test('partial file resolves full workspace config via resolveFullConfig', () => {
