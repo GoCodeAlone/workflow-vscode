@@ -58,7 +58,7 @@ jobs:
           test "$(git -C fixture rev-parse HEAD)" = "$GITHUB_SHA"
           test -f fixture/src/test/transport/wfctl-https.test.ts
           test ! -L fixture/src/test/transport/wfctl-https.test.ts
-          echo 'bd7a6b93c946b53097795f9ca367efe5eafd2883ac87c3c6eb52202638798a0d  fixture/src/test/transport/wfctl-https.test.ts' | sha256sum --check
+          echo '54ab8d4d1b1d134e5fc6e564e20586054fa0a8b21ef17607c4aced02f3d0dbff  fixture/src/test/transport/wfctl-https.test.ts' | sha256sum --check
           echo '7a6aceb508382fa41e35b1dce624226d25698ad6d948c77bc7ecb2dd5c579d4a  candidate/src/wfctl.ts' | sha256sum --check
           echo 'b39a28ddbdd0a52e304be291f6c86a13948120a7a199374ae273e7f10a7b9480  candidate/package-lock.json' | sha256sum --check
           git -C candidate diff --exit-code HEAD
@@ -87,10 +87,20 @@ jobs:
           umask 077
           runtime=$(mktemp -d "$RUNNER_TEMP/wfctl-https.XXXXXXXX")
           cleanup() {
-            rm -rf -- "$runtime"
-            test ! -e "$runtime" && test ! -L "$runtime"
+            if rm -rf -- "$runtime" && test ! -e "$runtime" && test ! -L "$runtime"; then
+              echo 'Owned runtime/TLS cleanup: absence verified'
+            else
+              echo '::error::Owned runtime/TLS cleanup failed'
+              return 1
+            fi
           }
-          trap cleanup EXIT
+          on_exit() {
+            local original_status=$?
+            trap - EXIT
+            if ! cleanup; then exit 1; fi
+            exit "$original_status"
+          }
+          trap on_exit EXIT
           mkdir -p "$runtime/src/test/transport" "$runtime/src/baseline" "$runtime/tls" "$runtime/tmp"
           cp candidate/src/wfctl.ts "$runtime/src/wfctl.ts"
           cp fixture/src/test/transport/wfctl-https.test.ts "$runtime/src/test/transport/wfctl-https.test.ts"
@@ -110,6 +120,7 @@ jobs:
           baseline_status=0
           WFCTL_MODULE="$runtime/out/baseline/wfctl.js" timeout 30s node --test --test-reporter=tap "$test_file" > "$runtime/baseline.log" 2>&1 || baseline_status=$?
           cat "$runtime/baseline.log"
+          echo "Original baseline exit status: $baseline_status"
           test "$baseline_status" -eq 1
           grep -Fxq 'not ok 1 - real HTTPS interruption preserves the cache and cleans staging' "$runtime/baseline.log"
           grep -Fq 'cached bytes changed while HTTPS transfer is active' "$runtime/baseline.log"
@@ -118,19 +129,20 @@ jobs:
           grep -Fxq '# fail 1' "$runtime/baseline.log"
           grep -Fxq '# cancelled 0' "$runtime/baseline.log"
           grep -Fxq '# skipped 0' "$runtime/baseline.log"
+          grep -Fq 'wfctl fixture cleanup: writes closed; server closed; root absent' "$runtime/baseline.log"
           fixed_status=0
           WFCTL_MODULE="$runtime/out/wfctl.js" timeout 30s node --test --test-reporter=tap "$test_file" > "$runtime/fixed.log" 2>&1 || fixed_status=$?
           cat "$runtime/fixed.log"
+          echo "Fixed candidate exit status: $fixed_status"
           test "$fixed_status" -eq 0
           grep -Fxq '# tests 1' "$runtime/fixed.log"
           grep -Fxq '# pass 1' "$runtime/fixed.log"
           grep -Fxq '# fail 0' "$runtime/fixed.log"
           grep -Fxq '# cancelled 0' "$runtime/fixed.log"
           grep -Fxq '# skipped 0' "$runtime/fixed.log"
+          grep -Fq 'wfctl fixture cleanup: writes closed; server closed; root absent' "$runtime/fixed.log"
           remaining=$(find "$runtime/tmp" -mindepth 1 -print -quit)
           test -z "$remaining"
           git -C candidate diff --exit-code HEAD
           git -C fixture diff --exit-code HEAD
-          cleanup
-          trap - EXIT
-          echo 'Owned transport fixture and TLS material removed; baseline rejected and fixed case passed.'
+          echo 'Original baseline rejected as expected; fixed real HTTPS case passed.'
