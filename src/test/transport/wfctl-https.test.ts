@@ -58,9 +58,11 @@ test('real HTTPS interruption preserves the cache and cleans staging', { timeout
   const requests: ClientRequest[] = [];
   const responses: IncomingMessage[] = [];
   const writes: fs.WriteStream[] = [];
+  const writerClosed: Promise<void>[] = [];
   let phase: TransferPhase = 'transfer';
   const writerErrors: { code: string | undefined; phase: TransferPhase }[] = [];
   let passed = false;
+  let primaryFailure: { error: unknown } | undefined;
   const requestedUrls: string[] = [];
   let assetResponse: ServerResponse | undefined;
   let assetIncoming: IncomingMessage | undefined;
@@ -131,6 +133,8 @@ test('real HTTPS interruption preserves the cache and cleans staging', { timeout
         stream.on('error', (error: NodeJS.ErrnoException) => {
           writerErrors.push({ code: error.code, phase });
         });
+        // closed can become true before error/close callbacks run. Observe the event.
+        writerClosed.push(new Promise<void>(resolve => stream.once('close', resolve)));
         writes.push(stream);
         stream.once('open', reportOpen);
         stream.once('pipe', reportPipe);
@@ -191,6 +195,7 @@ test('real HTTPS interruption preserves the cache and cleans staging', { timeout
     assert.equal(result.ok, false, 'incomplete HTTPS transfer must reject');
     if (result.ok) throw new Error('Unreachable successful transfer');
     assert.match(result.error.code ?? '', /^(ECONNRESET|ERR_STREAM_PREMATURE_CLOSE)$/);
+    await within(Promise.all(writerClosed), 'download writer close');
     assert.ok(writerErrors.every(error => error.phase === 'peer-close' &&
       /^(ECONNRESET|ERR_STREAM_PREMATURE_CLOSE)$/.test(error.code ?? '')), 'unexpected writer error during peer close');
     assert.equal(incoming.complete, false);
@@ -200,31 +205,41 @@ test('real HTTPS interruption preserves the cache and cleans staging', { timeout
     assert.equal(await api.resolveWfctlPath(context, output), destination);
     assert.deepEqual(requestedUrls, [metadataUrl, assetUrl], 'cached resolution must not issue a request');
     passed = true;
+    console.log('wfctl fixture primary outcome: passed');
+  } catch (error) {
+    primaryFailure = { error };
+    console.error('wfctl fixture primary outcome: failed:', error);
+    throw error;
   } finally {
-    console.log('wfctl fixture cleanup started:', JSON.stringify({ phase, pendingWriteBytes: writes.map(stream => stream.writableLength) }));
-    phase = 'cleanup';
     try {
-      for (const request of requests) request.destroy();
-      for (const response of responses) response.destroy();
-      for (const socket of sockets) socket.destroy();
-      for (const stream of writes) {
-        const closed = stream.closed ? Promise.resolve() : new Promise<void>(resolve => stream.once('close', resolve));
-        stream.destroy();
-        await within(closed, 'owned file close');
+      console.log('wfctl fixture cleanup started:', JSON.stringify({ phase, pendingWriteBytes: writes.map(stream => stream.writableLength) }));
+      phase = 'cleanup';
+      try {
+        for (const request of requests) request.destroy();
+        for (const response of responses) response.destroy();
+        for (const socket of sockets) socket.destroy();
+        for (const [index, stream] of writes.entries()) {
+          stream.destroy();
+          await within(writerClosed[index], 'owned file close');
+        }
+        if (server.listening) {
+          await within(new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())), 'server close');
+        }
+        assert.ok(writes.every(stream => stream.closed), 'owned writers must be closed');
+        assert.equal(server.listening, false, 'owned server must be closed');
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+        assert.equal(fs.existsSync(root), false, 'owned fixture directory must be removed');
+        console.log('wfctl fixture root absence verified');
       }
-      if (server.listening) {
-        await within(new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())), 'server close');
-      }
-      assert.ok(writes.every(stream => stream.closed), 'owned writers must be closed');
-      assert.equal(server.listening, false, 'owned server must be closed');
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-      assert.equal(fs.existsSync(root), false, 'owned fixture directory must be removed');
-      console.log('wfctl fixture root absence verified');
+      console.log('wfctl fixture writer errors:', JSON.stringify(writerErrors));
+      assert.ok(writerErrors.filter(error => error.phase === 'cleanup').every(error =>
+        !passed && error.code === 'ERR_STREAM_DESTROYED'), 'unexpected writer error during cleanup');
+      console.log('wfctl fixture cleanup: writes closed; server closed; root absent');
+    } catch (error) {
+      console.error('wfctl fixture cleanup failed:', error);
+      // Keep the original failure; CI separately requires the cleanup success marker.
+      if (!primaryFailure) throw error;
     }
-    console.log('wfctl fixture writer errors:', JSON.stringify(writerErrors));
-    assert.ok(writerErrors.filter(error => error.phase === 'cleanup').every(error =>
-      !passed && error.code === 'ERR_STREAM_DESTROYED'), 'unexpected writer error during cleanup');
-    console.log('wfctl fixture cleanup: writes closed; server closed; root absent');
   }
 });
