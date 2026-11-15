@@ -1,0 +1,86 @@
+name: Validate fixed wfctl download candidate
+
+# One-off validation of the reviewed source, not the triggering workflow commit.
+on:
+  push:
+    branches:
+      - fix/wfctl-download-recovery-20261031
+    paths:
+      - .github/workflows/validate-wfctl-download-candidate.yml
+
+permissions: {}
+
+concurrency:
+  group: wfctl-download-candidate-8835da0d
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build candidate 8835da0d (extension and webview)
+    if: >-
+      ${{ github.event_name == 'push' &&
+          github.server_url == 'https://github.com' &&
+          github.repository == 'GoCodeAlone/workflow-vscode' &&
+          github.repository_id == '1168579241' &&
+          github.ref == 'refs/heads/fix/wfctl-download-recovery-20261031' &&
+          !github.event.deleted }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Check out the reviewed candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: GoCodeAlone/workflow-vscode
+          ref: 8835da0dbff81f5545daa9c2dcd4be76990ee74b
+          fetch-depth: 2
+          persist-credentials: false
+          set-safe-directory: false
+
+      - name: Verify source binding before installing dependencies
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = '8835da0dbff81f5545daa9c2dcd4be76990ee74b'
+          test "$(git rev-parse 'HEAD^{tree}')" = '55adaca897f47f8f149a42c13aa4b685c7391af2'
+          test "$(git show -s --format=%P HEAD)" = 'bba230bf7c764fa97acb6d8625800539c6ad2e8e 3b7c32e5e486dcaf1e8ebc691134578a6d074b99'
+          echo 'b39a28ddbdd0a52e304be291f6c86a13948120a7a199374ae273e7f10a7b9480  package-lock.json' | sha256sum --check
+          git diff --exit-code HEAD
+          echo 'Validating frozen candidate 8835da0dbff81f5545daa9c2dcd4be76990ee74b'
+
+      - name: Set up Node and the existing scoped package registry
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          registry-url: https://npm.pkg.github.com
+          scope: '@gocodealone'
+
+      - name: Install the locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build the extension and webview without package credentials
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ''
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
+          # Prevent npm/npx fallback downloads; this is not network isolation.
+          NPM_CONFIG_OFFLINE: 'true'
+        run: |
+          node --version
+          npm --version
+          rm -f out/extension.js out/extension.js.map webview-dist/index.js webview-dist/index.css
+          npm run build
+
+      - name: Verify fresh outputs and unchanged build inputs
+        shell: bash
+        run: |
+          test -s out/extension.js
+          test -s out/extension.js.map
+          test -s webview-dist/index.js
+          test -s webview-dist/index.css
+          echo 'b39a28ddbdd0a52e304be291f6c86a13948120a7a199374ae273e7f10a7b9480  package-lock.json' | sha256sum --check
+          git diff --exit-code HEAD -- . ':!webview-dist/index.js' ':!webview-dist/index.css'
+          sha256sum out/extension.js out/extension.js.map webview-dist/index.js webview-dist/index.css
