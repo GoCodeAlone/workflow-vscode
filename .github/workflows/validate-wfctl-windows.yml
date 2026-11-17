@@ -1,0 +1,149 @@
+name: Qualify merged wfctl recovery on Windows
+
+on:
+  push:
+    branches:
+      - ci/wfctl-windows-qualification-20261117
+    paths:
+      - .github/workflows/validate-wfctl-windows.yml
+
+permissions: {}
+
+concurrency:
+  group: wfctl-windows-8b602cd9
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    if: >-
+      ${{ github.event_name == 'push' &&
+          github.server_url == 'https://github.com' &&
+          github.repository == 'GoCodeAlone/workflow-vscode' &&
+          github.repository_id == '1168579241' &&
+          github.ref == 'refs/heads/ci/wfctl-windows-qualification-20261117' &&
+          !github.event.deleted }}
+    runs-on: windows-2022
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      WFCTL_RUN_ROOT: ${{ github.workspace }}/wfctl-windows-${{ github.run_id }}-${{ github.run_attempt }}
+      NPM_CONFIG_CACHE: ${{ github.workspace }}/wfctl-windows-${{ github.run_id }}-${{ github.run_attempt }}/npm-cache
+
+    steps:
+      - name: Create owned runtime directories
+        timeout-minutes: 1
+        run: |
+          $root = [IO.Path]::GetFullPath($env:WFCTL_RUN_ROOT)
+          $expected = Join-Path $env:GITHUB_WORKSPACE "wfctl-windows-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if ($root -ne [IO.Path]::GetFullPath($expected)) { throw 'Unexpected runtime path' }
+          if (Test-Path -LiteralPath $root) { throw 'Runtime path already exists' }
+          New-Item -ItemType Directory -Path $root -ErrorAction Stop | Out-Null
+          Set-Content -LiteralPath (Join-Path $root '.owner') -NoNewline -Value "$env:GITHUB_REPOSITORY@$env:GITHUB_RUN_ID/$env:GITHUB_RUN_ATTEMPT"
+          New-Item -ItemType Directory -Path (Join-Path $root 'temp'), (Join-Path $root 'npm-cache') -ErrorAction Stop | Out-Null
+
+      - name: Check out the frozen merged source
+        timeout-minutes: 1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: GoCodeAlone/workflow-vscode
+          ref: 8b602cd9d8d974b2a2596c94b3d82830cec5fafd
+          path: wfctl-windows-${{ github.run_id }}-${{ github.run_attempt }}/source
+          persist-credentials: false
+          set-safe-directory: false
+
+      - name: Verify the source binding
+        timeout-minutes: 1
+        working-directory: wfctl-windows-${{ github.run_id }}-${{ github.run_attempt }}/source
+        run: |
+          $head = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $head -ne '8b602cd9d8d974b2a2596c94b3d82830cec5fafd') { throw 'Unexpected source commit' }
+          $tree = git rev-parse 'HEAD^{tree}'
+          if ($LASTEXITCODE -ne 0 -or $tree -ne '136cce5028655fc313d104e13db232abb9b3eada') { throw 'Unexpected source tree' }
+          git diff --exit-code HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Source differs from the frozen commit' }
+          Write-Output "Windows qualification source: $head tree: $tree"
+
+      - name: Set up Node and existing scoped package access
+        timeout-minutes: 1
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20.20.2'
+          registry-url: https://npm.pkg.github.com
+          scope: '@gocodealone'
+
+      - name: Install exact dependencies without lifecycle scripts
+        timeout-minutes: 3
+        working-directory: wfctl-windows-${{ github.run_id }}-${{ github.run_attempt }}/source
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TEMP: ${{ env.WFCTL_RUN_ROOT }}/temp
+          TMP: ${{ env.WFCTL_RUN_ROOT }}/temp
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'Locked dependency installation failed' }
+
+      - name: Compile the extension and stock tests
+        timeout-minutes: 1
+        working-directory: wfctl-windows-${{ github.run_id }}-${{ github.run_attempt }}/source
+        env:
+          NODE_AUTH_TOKEN: ''
+          NPM_CONFIG_OFFLINE: 'true'
+          TEMP: ${{ env.WFCTL_RUN_ROOT }}/temp
+          TMP: ${{ env.WFCTL_RUN_ROOT }}/temp
+        run: |
+          npm run compile
+          if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
+
+      - name: Run the stock Windows extension-host suite
+        timeout-minutes: 4
+        working-directory: wfctl-windows-${{ github.run_id }}-${{ github.run_attempt }}/source
+        env:
+          NODE_AUTH_TOKEN: ''
+          NPM_CONFIG_OFFLINE: 'true'
+          TEMP: ${{ env.WFCTL_RUN_ROOT }}/temp
+          TMP: ${{ env.WFCTL_RUN_ROOT }}/temp
+        run: |
+          # The locked stock launcher downloads VS Code and supplies its existing
+          # sandbox/workspace-trust disabling flags; no launcher flags are added here.
+          # Its runtime, profile and extensions directory live under source/.vscode-test.
+          npm test 2>&1 | Tee-Object -FilePath (Join-Path $env:WFCTL_RUN_ROOT 'host-tests.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Windows extension-host tests failed' }
+          $log = Get-Content -LiteralPath (Join-Path $env:WFCTL_RUN_ROOT 'host-tests.log') -Raw
+          $log = $log -replace '\x1B\[[0-9;]*m', ''
+          if ($log -notmatch '(?m)^\s*167 passing\b' -or $log -notmatch '(?m)^\s*1 pending\b') { throw 'Unexpected stock suite counts' }
+          if ($log -notmatch 'default cache rejects non-executable file') { throw 'Expected Windows permission skip was not reported' }
+          Write-Output 'Windows host suite passed; Unix-permission case intentionally skipped.'
+          Write-Output 'This does not qualify locked-file replacement, live release downloads or the separate HTTPS fixture.'
+
+      - name: Verify unchanged source after qualification
+        timeout-minutes: 1
+        working-directory: wfctl-windows-${{ github.run_id }}-${{ github.run_attempt }}/source
+        run: |
+          git diff --exit-code HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Qualification changed tracked source' }
+
+      - name: Remove owned runtime and verify absence
+        if: ${{ always() }}
+        timeout-minutes: 1
+        env:
+          NODE_AUTH_TOKEN: ''
+        run: |
+          $root = [IO.Path]::GetFullPath($env:WFCTL_RUN_ROOT)
+          $expected = Join-Path $env:GITHUB_WORKSPACE "wfctl-windows-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if ($root -ne [IO.Path]::GetFullPath($expected)) { throw 'Refusing unexpected cleanup path' }
+          if (Test-Path -LiteralPath $root) {
+            $item = Get-Item -LiteralPath $root -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Refusing a redirected runtime root' }
+            $owner = Get-Content -LiteralPath (Join-Path $root '.owner') -Raw -ErrorAction Stop
+            if ($owner -ne "$env:GITHUB_REPOSITORY@$env:GITHUB_RUN_ID/$env:GITHUB_RUN_ATTEMPT") { throw 'Runtime ownership mismatch' }
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction Stop
+          }
+          if (Test-Path -LiteralPath $root) { throw 'Owned runtime remains' }
+          Write-Output 'Owned checkout, test fixtures, VS Code profile/runtime and npm cache absence verified.'
+          # setup-node's registry config and runner-managed tool files are outside this root.
+          # A hard job cancellation can prevent this step; do not infer cleanup from a timeout.
