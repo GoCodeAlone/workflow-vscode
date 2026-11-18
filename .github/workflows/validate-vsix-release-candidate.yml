@@ -1,0 +1,170 @@
+name: Package VS Code 0.85.401 candidate
+
+on:
+  push:
+    branches: [ci/vsix-v0.85.401]
+    paths: [.github/workflows/validate-vsix-release-candidate.yml]
+
+permissions: {}
+
+concurrency:
+  group: vsix-candidate-bc4bfea
+  cancel-in-progress: false
+
+jobs:
+  package:
+    if: >-
+      ${{ github.event_name == 'push' &&
+          github.server_url == 'https://github.com' &&
+          github.repository == 'GoCodeAlone/workflow-vscode' &&
+          github.repository_id == '1168579241' &&
+          github.ref == 'refs/heads/ci/vsix-v0.85.401' &&
+          !github.event.deleted }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      VSIX_RUN_ROOT: ${{ github.workspace }}/vsix-${{ github.run_id }}-${{ github.run_attempt }}
+      NPM_CONFIG_CACHE: ${{ github.workspace }}/vsix-${{ github.run_id }}-${{ github.run_attempt }}/npm-cache
+
+    steps:
+      - name: Create owned package directories
+        timeout-minutes: 1
+        run: |
+          test "$VSIX_RUN_ROOT" = "$GITHUB_WORKSPACE/vsix-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          test ! -e "$VSIX_RUN_ROOT" && test ! -L "$VSIX_RUN_ROOT"
+          mkdir -m 700 "$VSIX_RUN_ROOT"
+          printf '%s' "$GITHUB_REPOSITORY@$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT" > "$VSIX_RUN_ROOT/.owner"
+          mkdir "$VSIX_RUN_ROOT/output" "$VSIX_RUN_ROOT/tmp" "$VSIX_RUN_ROOT/npm-cache"
+
+      - name: Check out the reviewed version candidate
+        timeout-minutes: 1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: GoCodeAlone/workflow-vscode
+          ref: bc4bfea16f8f01af236cd29e3942af27acbcecdf
+          path: vsix-${{ github.run_id }}-${{ github.run_attempt }}/source
+          persist-credentials: false
+          set-safe-directory: false
+
+      - name: Set up Node and existing scoped package access
+        timeout-minutes: 1
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20.20.2'
+          registry-url: https://npm.pkg.github.com
+          scope: '@gocodealone'
+
+      - name: Verify source and install locked dependencies
+        timeout-minutes: 2
+        working-directory: vsix-${{ github.run_id }}-${{ github.run_attempt }}/source
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TMPDIR: ${{ env.VSIX_RUN_ROOT }}/tmp
+        run: |
+          test "$(git rev-parse HEAD)" = bc4bfea16f8f01af236cd29e3942af27acbcecdf
+          test "$(git rev-parse 'HEAD^{tree}')" = a0cfddb285db771fbaa855d0d8fdf60dc597fcbc
+          echo 'a288d1572b4a2a610031454b772a3adc513303f8e212562728488c3b4ada9d89  package.json' | sha256sum --check
+          echo '46a48bb70355ae4c78ab83cb9bf9974f1dab63a5208bc7110b485c1bb4d126da  package-lock.json' | sha256sum --check
+          git diff --exit-code HEAD
+          npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Build, package and inspect without installing the extension
+        timeout-minutes: 2
+        working-directory: vsix-${{ github.run_id }}-${{ github.run_attempt }}/source
+        env:
+          NODE_AUTH_TOKEN: ''
+          NPM_CONFIG_OFFLINE: 'true'
+          TMPDIR: ${{ env.VSIX_RUN_ROOT }}/tmp
+        run: |
+          # vsce invokes the existing vscode:prepublish build exactly once.
+          # Do not compile tests here: out/test is not excluded by the stock package rules.
+          npm run package -- --out "$VSIX_RUN_ROOT/output/workflow-engine-0.85.401.vsix"
+          git diff --exit-code HEAD -- . ':(exclude)webview-dist/index.js'
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, re, stat, subprocess, xml.etree.ElementTree as ET, zipfile
+          root = pathlib.Path(os.environ['VSIX_RUN_ROOT'])
+          package = root / 'output/workflow-engine-0.85.401.vsix'
+          assert 0 < package.stat().st_size < 20 * 1024 * 1024, 'Unexpected VSIX size'
+          expected = json.loads(pathlib.Path('package.json').read_text())
+          assert (expected['publisher'], expected['name'], expected['version']) == ('GoCodeAlone', 'workflow-engine', '0.85.401')
+          with zipfile.ZipFile(package) as archive:
+              entries = archive.infolist()
+              names = [entry.filename for entry in entries]
+              assert len(names) == len(set(names)), 'Duplicate archive names'
+              assert sum(entry.file_size for entry in entries) < 100 * 1024 * 1024, 'Unexpected expanded size'
+              forbidden = {'.git', '.github', 'node_modules', '.vscode-test', '.npmrc', '.env', '.owner'}
+              normalized = set()
+              for entry in entries:
+                  path = pathlib.PurePosixPath(entry.filename)
+                  assert not path.is_absolute() and '..' not in path.parts and '\\' not in entry.filename, 'Unsafe archive path'
+                  assert not re.match(r'^[A-Za-z]:', entry.filename), 'Drive-qualified archive path'
+                  assert str(path) not in normalized, 'Duplicate normalized archive path'
+                  normalized.add(str(path))
+                  assert not any(part in forbidden for part in path.parts), 'Unwanted archive entry'
+                  assert stat.S_IFMT(entry.external_attr >> 16) != stat.S_IFLNK, 'Archive symlink'
+                  assert not entry.filename.startswith(('extension/out/test/', 'extension/src/test/')), 'Test output in package'
+                  if entry.filename.startswith('extension/src/') and not entry.is_dir():
+                      assert entry.filename == 'extension/src/extension.ts', 'Unexpected packaged source'
+                  if not entry.is_dir():
+                      data = archive.read(entry)
+                      assert not re.search(rb'(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})', data), 'Credential-shaped archive content'
+              manifest = ET.fromstring(archive.read('extension.vsixmanifest'))
+              identity = manifest.find('.//{*}Identity')
+              assert identity is not None
+              assert (identity.get('Publisher'), identity.get('Id'), identity.get('Version')) == ('GoCodeAlone', 'workflow-engine', '0.85.401')
+              packaged = json.loads(archive.read('extension/package.json'))
+              for field in ['publisher', 'name', 'version', 'main', 'engines']:
+                  assert packaged[field] == expected[field], 'Packaged manifest mismatch: ' + field
+              assets = {}
+              for relative in ['out/extension.js', 'webview-dist/index.js']:
+                  data = archive.read('extension/' + relative)
+                  assert data, 'Empty packaged asset'
+                  assert data == pathlib.Path(relative).read_bytes(), 'Packaged asset differs from build'
+                  assets[relative] = hashlib.sha256(data).hexdigest()
+              bundle = archive.read('extension/out/extension.js')
+              for marker in [b'.wfctl-download-', b'Downloaded wfctl is empty or incomplete', b'Downloaded wfctl size does not match Content-Length']:
+                  assert marker in bundle, 'Recovery implementation missing from bundle'
+              assert b'## [0.85.401]' in archive.read('extension/CHANGELOG.md')
+          digest = hashlib.sha256(package.read_bytes()).hexdigest()
+          receipt = {'source_commit': 'bc4bfea16f8f01af236cd29e3942af27acbcecdf', 'source_tree': 'a0cfddb285db771fbaa855d0d8fdf60dc597fcbc', 'workflow_commit': os.environ['GITHUB_SHA'], 'version': '0.85.401', 'publisher': 'GoCodeAlone', 'name': 'workflow-engine', 'vsix_name': package.name, 'vsix_bytes': package.stat().st_size, 'vsix_sha256': digest, 'archive_entries': len(entries), 'asset_sha256': assets, 'node': subprocess.check_output(['node', '--version'], text=True).strip(), 'inspection': 'identity, build-asset equality, recovery markers and archive hygiene passed', 'limits': 'No extension installation, host/transport tests, live wfctl activation or Marketplace publication; bundle inspection is not behavioral acceptance.'}
+          (root / 'output/inspection.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          (root / 'output/SHA256SUMS').write_text(digest + '  ' + package.name + '\n')
+          print(json.dumps(receipt))
+          PY
+
+      - name: Retain the inspected CI artifact
+        timeout-minutes: 1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: workflow-engine-0.85.401-bc4bfea
+          path: |
+            ${{ env.VSIX_RUN_ROOT }}/output/workflow-engine-0.85.401.vsix
+            ${{ env.VSIX_RUN_ROOT }}/output/SHA256SUMS
+            ${{ env.VSIX_RUN_ROOT }}/output/inspection.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+          include-hidden-files: false
+
+      - name: Remove owned runtime and verify absence
+        if: ${{ always() }}
+        timeout-minutes: 1
+        env:
+          NODE_AUTH_TOKEN: ''
+        run: |
+          test "$VSIX_RUN_ROOT" = "$GITHUB_WORKSPACE/vsix-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if test -e "$VSIX_RUN_ROOT" || test -L "$VSIX_RUN_ROOT"; then
+            test -d "$VSIX_RUN_ROOT" && test ! -L "$VSIX_RUN_ROOT"
+            test "$(cat "$VSIX_RUN_ROOT/.owner")" = "$GITHUB_REPOSITORY@$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"
+            rm -rf -- "$VSIX_RUN_ROOT"
+          fi
+          test ! -e "$VSIX_RUN_ROOT" && test ! -L "$VSIX_RUN_ROOT"
+          echo 'Owned package source, dependencies, cache and local artifact copies removed; CI artifact retained separately.'
+          # setup-node registry configuration and runner-managed tools are outside this root.
+          # Hard termination may prevent cleanup; a timeout alone proves no cleanup outcome.
