@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial CHANGELOG + CONTRIBUTING (QoL sweep follow-up).
 
+## [0.85.401]
+
 ### Fixed
 - Preserve cached `wfctl` binaries when downloads fail or are interrupted by validating staged downloads before replacement.
 
