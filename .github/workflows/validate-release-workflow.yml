@@ -1,0 +1,33 @@
+name: Release workflow regression
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .github/workflows/validate-release-workflow.yml
+      - .github/tests/release-workflow.test.cjs
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/release.yml
+      - .github/workflows/validate-release-workflow.yml
+      - .github/tests/release-workflow.test.cjs
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20.20.2'
+      - name: Check release status handling without publication
+        run: |
+          git rev-parse HEAD
+          node --test --test-concurrency=1 .github/tests/release-workflow.test.cjs

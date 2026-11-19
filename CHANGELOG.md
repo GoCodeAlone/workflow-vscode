@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial CHANGELOG + CONTRIBUTING (QoL sweep follow-up).
 
+### Fixed
+- Fail release validation when Marketplace publication fails, while reporting GitHub release and Marketplace outcomes separately.
+
 ## [0.85.401]
 
 ### Fixed

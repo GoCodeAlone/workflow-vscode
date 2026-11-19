@@ -297,8 +297,10 @@ vsce publish patch   # increments patch version, packages, and publishes
 
 The `.github/workflows/release.yml` workflow handles publishing automatically:
 
-- Every push to `main` runs a build and type-check.
-- Every `v*` tag push additionally packages the extension and publishes it to the VS Code Marketplace using the `VSCE_PAT` secret.
+- Every push to `master` runs a build, type-check and extension-host tests.
+- Every `v*` tag push additionally packages the extension, creates a GitHub release and attempts Marketplace publication using the `VSCE_PAT` secret.
+
+Missing publisher authentication or a failed Marketplace command fails the workflow. The job summary reports GitHub release and Marketplace step outcomes separately: a Marketplace failure does not undo a successful GitHub release. Inspect any failed or cancelled publication step for partial results before retrying; command success alone does not verify public Marketplace indexing.
 
 To set up the secret:
 1. Go to the repository on GitHub > **Settings** > **Secrets and variables** > **Actions**.

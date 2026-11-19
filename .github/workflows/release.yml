@@ -47,7 +47,7 @@ jobs:
         run: npm run build
 
   release:
-    name: Package & Release
+    name: GitHub release & Marketplace
     runs-on: ubuntu-latest
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
@@ -80,13 +80,51 @@ jobs:
           path: '*.vsix'
 
       - name: Create GitHub Release
+        id: github_release
         uses: softprops/action-gh-release@v2
         with:
           files: '*.vsix'
           generate_release_notes: true
 
       - name: Publish to VS Code Marketplace
-        continue-on-error: true
-        run: npm run publish
+        id: marketplace
+        shell: bash
+        run: |
+          if [ -z "${VSCE_PAT:-}" ]; then
+            echo "::error::VSCE_PAT is unavailable; Marketplace publication was not attempted."
+            exit 1
+          fi
+          npm run publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Report publication outcomes
+        if: ${{ always() }}
+        shell: bash
+        env:
+          GITHUB_RELEASE_OUTCOME: ${{ steps.github_release.outcome }}
+          MARKETPLACE_OUTCOME: ${{ steps.marketplace.outcome }}
+        run: |
+          outcome_label() {
+            case "$1" in
+              success|failure|cancelled|skipped) printf '%s' "$1" ;;
+              *) printf 'not recorded' ;;
+            esac
+          }
+          {
+            printf '## Release outcomes\n\n| Channel | Step outcome |\n| --- | --- |\n'
+            printf '| GitHub release | %s |\n' "$(outcome_label "$GITHUB_RELEASE_OUTCOME")"
+            printf '| Marketplace | %s |\n\n' "$(outcome_label "$MARKETPLACE_OUTCOME")"
+            case "$GITHUB_RELEASE_OUTCOME" in
+              success) printf 'GitHub release action completed successfully. A Marketplace failure does not roll back that release.\n\n' ;;
+              failure|cancelled) printf 'Partial GitHub release or assets may exist; inspect the release action before retrying.\n\n' ;;
+              skipped) printf 'GitHub release action was not attempted.\n\n' ;;
+              *) printf 'GitHub release outcome was not recorded.\n\n' ;;
+            esac
+            case "$MARKETPLACE_OUTCOME" in
+              success) printf 'Marketplace publish command succeeded; public Marketplace indexing is not independently verified.\n' ;;
+              failure|cancelled) printf 'Marketplace publication is not confirmed; inspect the Marketplace step before retrying.\n' ;;
+              skipped) printf 'Marketplace publication was not attempted.\n' ;;
+              *) printf 'Marketplace outcome was not recorded.\n' ;;
+            esac
+          } >> "$GITHUB_STEP_SUMMARY"
